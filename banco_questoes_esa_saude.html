@@ -100,7 +100,7 @@ body {
 
 /* SIDEBAR */
 #sidebar {
-  width: 240px;
+  width: 250px;
   flex-shrink: 0;
   background: var(--bg2);
   border-right: 1px solid var(--border);
@@ -300,6 +300,7 @@ body {
 .tag-banca { background: rgba(79,156,249,0.15); color: var(--accent); border: 1px solid rgba(79,156,249,0.3); }
 .tag-ano { background: var(--bg3); color: var(--text2); border: 1px solid var(--border); }
 .tag-materia { background: rgba(52,211,153,0.12); color: var(--green); border: 1px solid rgba(52,211,153,0.25); }
+.tag-modulo { background: rgba(167, 139, 250, 0.12); color: var(--purple); border: 1px solid rgba(167, 139, 250, 0.25); }
 .tag-dif-1, .tag-dif-2 { background: rgba(52,211,153,0.1); color: var(--green); border: 1px solid rgba(52,211,153,0.2); }
 .tag-dif-3 { background: rgba(251,191,36,0.1); color: var(--amber); border: 1px solid rgba(251,191,36,0.2); }
 .tag-dif-4, .tag-dif-5 { background: rgba(248,113,113,0.1); color: var(--red); border: 1px solid rgba(248,113,113,0.2); }
@@ -368,15 +369,32 @@ body {
 .q-gabarito {
   display: none;
   margin-top: 12px;
-  padding: 10px 14px;
-  background: rgba(52,211,153,0.08);
-  border: 1px solid rgba(52,211,153,0.25);
+  padding: 14px;
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid var(--border2);
   border-radius: var(--r);
-  font-size: 12px;
-  color: var(--green);
-  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.6;
 }
 .q-card.revealed .q-gabarito { display: block; }
+
+.gab-headline {
+  color: var(--green);
+  font-weight: 600;
+  font-family: var(--mono);
+  margin-bottom: 8px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.gab-resolucao {
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+  padding-top: 8px;
+  color: var(--text2);
+}
+.gab-resolucao strong { color: var(--text); }
 
 /* PANEL: SIMULADO */
 #panel-simulado {
@@ -492,8 +510,16 @@ body {
 </nav>
 
 <div id="app">
-  <!-- SIDEBAR -->
   <div id="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Módulo / Tópico</div>
+      <div class="filter-group" id="filter-modulo">
+        <button class="filter-btn active" data-modulo="" onclick="setFilter('modulo','',this)">
+          Todos <span class="count" id="cnt-mod-all">0</span>
+        </button>
+      </div>
+    </div>
+    <div class="sidebar-divider"></div>
     <div class="sidebar-section">
       <div class="sidebar-label">Matéria</div>
       <div class="filter-group" id="filter-materia">
@@ -534,15 +560,13 @@ body {
     </div>
   </div>
 
-  <!-- PANELS -->
   <div id="main">
 
-    <!-- BROWSE -->
     <div id="panel-browse" class="panel active">
       <div class="toolbar">
         <div class="search-wrap">
           <span class="search-icon">🔍</span>
-          <input id="search-input" type="text" placeholder="Buscar no enunciado ou tags..." oninput="renderList()">
+          <input id="search-input" type="text" placeholder="Buscar no enunciado, módulo ou tags..." oninput="renderList()">
         </div>
         <select class="select-filter" id="sort-select" onchange="renderList()">
           <option value="default">Ordem padrão</option>
@@ -558,7 +582,6 @@ body {
       <div id="questions-list"></div>
     </div>
 
-    <!-- SIMULADO -->
     <div id="panel-simulado" class="panel">
       <div id="sim-setup">
         <div class="sim-config">
@@ -571,6 +594,12 @@ body {
               <option value="20">20 questões</option>
               <option value="30">30 questões</option>
               <option value="999">Todas</option>
+            </select>
+          </div>
+          <div class="sim-row">
+            <span class="sim-label">Módulo</span>
+            <select class="select-filter" id="sim-modulo">
+              <option value="">Todos os módulos</option>
             </select>
           </div>
           <div class="sim-row">
@@ -589,7 +618,7 @@ body {
             <span class="sim-label">Modo</span>
             <select class="select-filter" id="sim-modo">
               <option value="normal">Normal (gabarito ao final)</option>
-              <option value="imediato">Imediato (corrige na hora)</option>
+              <option value="imediato">Imediato (corrige e mostra resolução na hora)</option>
             </select>
           </div>
           <div class="sim-row" style="margin-top:16px;">
@@ -617,7 +646,6 @@ body {
       <div id="sim-resultado" style="display:none;"></div>
     </div>
 
-    <!-- ERROS -->
     <div id="panel-erros" class="panel">
       <div class="toolbar">
         <span style="font-size:14px; color:var(--text2);">Questões que você mais erra</span>
@@ -627,7 +655,6 @@ body {
       <div id="erros-list" style="flex:1; overflow-y:auto; padding:16px 20px; display:flex; flex-direction:column; gap:10px;"></div>
     </div>
 
-    <!-- STATS -->
     <div id="panel-stats" class="panel">
       <div id="stats-content" style="padding:24px; max-width:800px;"></div>
     </div>
@@ -637,319 +664,329 @@ body {
 
 <script>
 // =====================================================
-// BANCO DE DADOS — 60 questões reais dos PDFs
+// BANCO DE DADOS — 60 questões reais + Módulos & Resoluções
 // =====================================================
 const DB = [
   // ── ÉTICA PROFISSIONAL ──────────────────────────
-  {id:"e001",materia:"Ética Profissional",assunto:"Princípios Bioéticos",banca:"IBFC",ano:2016,dific:2,tipo:"memorização",
+  {id:"e001",materia:"Ética Profissional",modulo:"Módulo 1: Fundamentos e Bioética",assunto:"Princípios Bioéticos",banca:"IBFC",ano:2016,dific:2,tipo:"memorização",
    enunciado:"Não é um dos princípios fundamentais da Bioética a:",
    alts:{a:"Humanização",b:"Não maleficência",c:"Justiça",d:"Autonomia",e:"Beneficência"},gabarito:"a",
+   resolucao:"Os quatro pilares consolidados da Bioética Principialista (Beauchamp e Childress) são: <strong>Autonomia</strong>, <strong>Não Maleficência</strong>, <strong>Beneficência</strong> e <strong>Justiça</strong>. Embora a Humanização seja um princípio do SUS e um valor ético crucial na assistência, ela formalmente não faz parte do quarteto clássico da Bioética.",
    tags:["bioetica","principios","cofen"],fav:false},
 
-  {id:"e002",materia:"Ética Profissional",assunto:"Princípios Bioéticos",banca:"IBFC",ano:2013,dific:2,tipo:"conceitual",
+  {id:"e002",materia:"Ética Profissional",modulo:"Módulo 1: Fundamentos e Bioética",assunto:"Princípios Bioéticos",banca:"IBFC",ano:2013,dific:2,tipo:"conceitual",
    enunciado:"Sobre autonomia, um dos princípios da Bioética, assinale a alternativa correta.",
    alts:{a:"É a obrigação de não causar danos, de não prejudicar intencionalmente.",b:"É o poder da pessoa para tomar decisões quanto aos assuntos que afetam sua vida, saúde, integridade físico-psíquica e relações sociais.",c:"Entende-se por fazer o bem, cuidar da saúde, favorecer a qualidade de vida, dilatando os benefícios e evitando ou minorando os danos.",d:"Diz respeito à distribuição igual ou equitativa dos direitos e responsabilidades na sociedade.",e:"É a ausência de pressões externas sobre o profissional."},gabarito:"b",
+   resolucao:"A <strong>Autonomia</strong> refere-se à capacidade de autodeterminação do paciente, permitindo que ele tome decisões sobre seu próprio corpo e tratamento. A alternativa A define Não Maleficência; a C define Beneficência; e a D define Justiça.",
    tags:["bioetica","autonomia","principios"],fav:false},
 
-  {id:"e003",materia:"Ética Profissional",assunto:"Negligência/Imprudência/Imperícia",banca:"CRS",ano:2010,dific:2,tipo:"memorização",
+  {id:"e003",materia:"Ética Profissional",modulo:"Módulo 1: Fundamentos e Bioética",assunto:"Negligência/Imprudência/Imperícia",banca:"CRS",ano:2010,dific:2,tipo:"memorização",
    enunciado:"Assinale a alternativa CORRETA sobre princípios éticos: Considerando simultaneamente os princípios da beneficência e da não maleficência, o profissional de saúde deve:",
    alts:{a:"Fazer o bem, mesmo que cause dano ao paciente.",b:"Priorizar os benefícios e, ao mesmo tempo, evitar ou minimizar os riscos e danos ao paciente.",c:"Agir conforme a vontade do familiar do paciente, independente do bem-estar do paciente.",d:"Obedecer apenas às determinações médicas.",e:"Preservar a confidencialidade acima de tudo."},gabarito:"b",
+   resolucao:"O balanceamento ético exige maximizar o bem estar (<strong>beneficência</strong>) enquanto ativamente reduzimos os riscos colaterais e complicações do tratamento (<strong>não maleficência</strong>).",
    tags:["bioetica","beneficencia","nao_maleficencia"],fav:false},
 
-  {id:"e004",materia:"Ética Profissional",assunto:"Lei do Exercício Profissional",banca:"EsSA",ano:2014,dific:3,tipo:"legislação",
-   enunciado:"O Técnico de Enfermagem exerce atividade de nível médio, envolvendo orientação e acompanhamento do trabalho de enfermagem em grau auxiliar, e participação no planejamento da assistência de enfermagem, cabendo-lhe ESPECIALMENTE:",
+  {id:"e004",materia:"Ética Profissional",modulo:"Módulo 2: Legislação do Exercício",assunto:"Lei do Exercício Profissional",banca:"EsSA",ano:2014,dific:3,tipo:"legislação",
+   enunciado:"O Técnico de Enfermagem exerce atividade de nível médio, envolvendo orientação e acompanhamento do trabalho de enfermagem em grau auxiliar, e participation no planejamento da assistência de enfermagem, cabendo-lhe ESPECIALMENTE:",
    alts:{a:"Participar da programação da assistência de enfermagem.",b:"Executar ações de tratamento simples.",c:"Prestar cuidados de higiene e conforto do paciente.",d:"Prevenção e controle sistemático de danos que possam ser causados à clientela durante a assistência de enfermagem.",e:"Prevenção e controle sistemático da infecção hospitalar e de doenças transmissíveis em geral."},gabarito:"a",
+   resolucao:"De acordo com a Lei 7.498/86, art. 12, cabe ao Técnico de Enfermagem participar da programação da assistência de enfermagem. Executar ações simples e cuidados de higiene (B e C) são atribuições mais voltadas ao Auxiliar, enquanto D e E são atividades privativas do Enfermeiro ou compartilhadas na liderança da equipe.",
    tags:["lei_exercicio","tecnico_enfermagem","7498"],fav:false},
 
-  {id:"e005",materia:"Ética Profissional",assunto:"Lei do Exercício Profissional",banca:"EsFCEx",ano:2017,dific:2,tipo:"legislação",
+  {id:"e005",materia:"Ética Profissional",modulo:"Módulo 2: Legislação do Exercício",assunto:"Lei do Exercício Profissional",banca:"EsFCEx",ano:2017,dific:2,tipo:"legislação",
    enunciado:"Assinale a alternativa correta que se refere à lei que dispõe sobre as condições para a promoção, proteção e recuperação da saúde, a organização e o funcionamento dos serviços correspondentes e dá outras providências.",
    alts:{a:"Lei 8.080/90.",b:"Lei 429/06.",c:"Lei 1.035/88.",d:"Lei 9.808/09.",e:"Lei 2.793/77."},gabarito:"a",
+   resolucao:"A <strong>Lei 8.080 de 19 de setembro de 1990</strong> é a Lei Orgânica da Saúde que regula em todo o território nacional as ações e serviços de saúde do SUS.",
    tags:["lei_8080","sus","legislacao"],fav:false},
 
-  {id:"e006",materia:"Ética Profissional",assunto:"Lei do Exercício Profissional",banca:"CAP",ano:2018,dific:2,tipo:"legislação",
+  {id:"e006",materia:"Ética Profissional",modulo:"Módulo 2: Legislação do Exercício",assunto:"Lei do Exercício Profissional",banca:"CAP",ano:2018,dific:2,tipo:"legislação",
    enunciado:"De acordo com a Lei 7.498 de 25 de junho de 1986, o Técnico de Enfermagem exerce atividades de nível médio, envolvendo orientação e acompanhamento do trabalho de Enfermagem, cabendo-lhe especialmente:",
    alts:{a:"Prescrição da assistência de enfermagem.",b:"Realizar consulta de enfermagem.",c:"Participar da orientação e supervisão do trabalho de enfermagem em grau auxiliar.",d:"Realizar consultoria, auditoria e emissão de parecer sobre matéria de enfermagem.",e:"Prestar cuidados diretos de enfermagem a pacientes graves com risco de vida."},gabarito:"c",
+   resolucao:"O Técnico atua como uma ponte na liderança intermediária, cabendo-lhe participar na supervisão e orientação de auxiliares (Art. 12, b). Prescrição, Consulta, Auditoria e Pacientes Graves de alta complexidade (A, B, D, E) são privativos do Enfermeiro.",
    tags:["lei_7498","tecnico_enfermagem","atribuicoes"],fav:false},
 
-  {id:"e007",materia:"Ética Profissional",assunto:"COFEN/COREN",banca:"CSM",ano:2012,dific:3,tipo:"legislação",
+  {id:"e007",materia:"Ética Profissional",modulo:"Módulo 3: Código de Ética e Penalidades",assunto:"COFEN/COREN",banca:"CSM",ano:2012,dific:3,tipo:"legislação",
    enunciado:"Segundo a Resolução do COFEN n° 564/17, o enfermeiro está sujeito à suspensão do exercício profissional. Essa suspensão consiste na proibição do exercício da profissão da enfermagem por um período não superior a quantos dias?",
    alts:{a:"29",b:"39",c:"49",d:"69",e:"90"},gabarito:"e",
+   resolucao:"Atenção à atualização da Resolução COFEN 564/17! No código de ética anterior, o limite era de 29 dias. No código atual, a suspensão passou a ser por um período de <strong>até 90 (noventa) dias</strong>.",
    tags:["cofen","564","penalidades","suspensao"],fav:false},
 
-  {id:"e008",materia:"Ética Profissional",assunto:"Transplante de Órgãos",banca:"INSTITUTO AOCP",ano:2013,dific:3,tipo:"conceitual",
+  {id:"e008",materia:"Ética Profissional",modulo:"Módulo 1: Fundamentos e Bioética",assunto:"Transplante de Órgãos",banca:"INSTITUTO AOCP",ano:2013,dific:3,tipo:"conceitual",
    enunciado:"No que se refere ao processo de transplante/doação de órgãos, qual dos órgãos citados a seguir NÃO pode ser retirado de doador vivo?",
    alts:{a:"Medula óssea.",b:"Córnea.",c:"Rim.",d:"Parte do fígado.",e:"Parte do pulmão."},gabarito:"b",
    tags:["transplante","doacao_orgaos","morte_encefalica"],fav:false},
 
-  {id:"e009",materia:"Ética Profissional",assunto:"COFEN/COREN",banca:"CAP",ano:2017,dific:3,tipo:"legislação",
+  {id:"e009",materia:"Ética Profissional",modulo:"Módulo 3: Código de Ética e Penalidades",assunto:"COFEN/COREN",banca:"CAP",ano:2017,dific:3,tipo:"legislação",
    enunciado:"Conforme o Art. 122 do Capítulo V – Das Infrações e Penalidades - da Resolução COFEN 311/2007, é considerada situação ATENUANTE:",
    alts:{a:"Cometer infração dolosamente.",b:"Cometer infração com abuso de autoridade.",c:"Cometer infração por motivo fútil ou torpe.",d:"Realizar atos sob coação e/ou intimidação.",e:"Ter maus antecedentes profissionais."},gabarito:"d",
    tags:["cofen","penalidades","atenuante","infracao"],fav:false},
 
-  {id:"e010",materia:"Ética Profissional",assunto:"Código de Ética",banca:"CONTEMAX",ano:2019,dific:2,tipo:"legislação",
+  {id:"e010",materia:"Ética Profissional",modulo:"Módulo 3: Código de Ética e Penalidades",assunto:"Código de Ética",banca:"CONTEMAX",ano:2019,dific:2,tipo:"legislação",
    enunciado:"De acordo com o Código de Ética dos Profissionais de Enfermagem, Resolução COFEN Nº 564/2017, são consideradas circunstâncias atenuantes, EXCETO:",
    alts:{a:"Ter colaborado espontaneamente com a elucidação dos fatos.",b:"Ter bons antecedentes profissionais.",c:"Realizar atos sob coação e/ou intimidação ou grave ameaça.",d:"Ter o infrator cometido a infração por motivo fútil.",e:"Ter confessado espontaneamente a autoria da infração."},gabarito:"d",
    tags:["cofen","564","atenuante","infracao"],fav:false},
 
-  {id:"e011",materia:"Ética Profissional",assunto:"Código de Ética",banca:"HNMD",ano:2011,dific:3,tipo:"legislação",
+  {id:"e011",materia:"Ética Profissional",modulo:"Módulo 3: Código de Ética e Penalidades",assunto:"Código de Ética",banca:"HNMD",ano:2011,dific:3,tipo:"legislação",
    enunciado:"Em relação ao Código de Ética dos Profissionais de Enfermagem, assinale a afirmativa correta.",
    alts:{a:"É dever do profissional associar-se, exercer cargos e participar de atividades de Entidades de Classe.",b:"A multa é uma penalidade que consiste na obrigatoriedade de pagamento de 01 a 10 vezes o valor da anuidade da categoria profissional à qual pertence o infrator.",c:"A suspensão é uma penalidade que consiste na perda do direito do Exercício da Enfermagem.",d:"A penalidade de cassação do registro profissional é de competência do conselho regional de Enfermagem.",e:"São consideradas infrações graves as que provoquem morte, deformidade permanente, perda ou inutilização de membro, sentido ou função, ou ainda, dano moral irremediável."},gabarito:"e",
    tags:["codigo_etica","penalidades","infracao_grave"],fav:false},
 
-  {id:"e012",materia:"Ética Profissional",assunto:"Código de Ética",banca:"UFLA",ano:2018,dific:3,tipo:"legislação",
+  {id:"e012",materia:"Ética Profissional",modulo:"Módulo 3: Código de Ética e Penalidades",assunto:"Código de Ética",banca:"UFLA",ano:2018,dific:3,tipo:"legislação",
    enunciado:"De acordo com o §2º do Art. 111 da Resolução COFEN n°0564/2017, 'transgressões que provoquem debilidade temporária de membro, sentido ou função na pessoa ou ainda as que causem danos mentais, morais, patrimoniais ou financeiros', são consideradas infrações:",
    alts:{a:"Graves.",b:"Agravantes.",c:"Moderadas.",d:"Gravíssimas.",e:"Leves."},gabarito:"c",
    tags:["cofen","564","infracao","moderada"],fav:false},
 
-  {id:"e013",materia:"Ética Profissional",assunto:"Direitos do Profissional",banca:"MetroCapital",ano:2019,dific:2,tipo:"conceitual",
+  {id:"e013",materia:"Ética Profissional",modulo:"Módulo 1: Fundamentos e Bioética",assunto:"Direitos do Profissional",banca:"MetroCapital",ano:2019,dific:2,tipo:"conceitual",
    enunciado:"Se o enfermeiro se recusar a aplicar medicação que poderia comprometer a saúde do paciente, entende-se que esse profissional:",
-   alts:{a:"Exerceu seu dever profissional.",b:"Exerceu seu direito.",c:"Praticou omissão.",d:"Cometeu negligência.",e:"Cometeu imprudência."},gabarito:"b",
+   alts:{a:"Exerceu seu dever profissional.",b:"Exerceu seu direito.",c:"Praticou omissão.",d:"Cometeu negligence.",e:"Cometeu imprudência."},gabarito:"b",
    tags:["direitos","enfermeiro","recusa"],fav:false},
 
   // ── IMUNIZAÇÃO ──────────────────────────────────
-  {id:"i001",materia:"Imunização",assunto:"Febre Amarela",banca:"EAGS",ano:2019,dific:3,tipo:"clínico",
+  {id:"i001",materia:"Imunização",modulo:"Módulo 4: Imunização e Calendário Vacinal",assunto:"Febre Amarela",banca:"EAGS",ano:2019,dific:3,tipo:"clínico",
    enunciado:"A vacinação contra febre amarela (VFA) é a medida mais importante e eficaz para prevenção e controle da doença. Com relação a essa vacina, é correto afirmar que:",
    alts:{a:"Os anticorpos protetores aparecem entre o sétimo e o décimo dia após a aplicação da vacina.",b:"A via de administração da vacina contra febre amarela é exclusivamente intramuscular.",c:"O esquema vacinal consiste em uma dose única a partir dos 6 meses de idade.",d:"O volume da dose aplicada para vacina de febre amarela é de 0,05 ml.",e:"A vacina é indicada para gestantes sem restrições."},gabarito:"a",
+   resolucao:"A soroconversão e proteção efetiva ocorrem tipicamente a partir do 7º ao 10º dia pós-infusão subcutânea (e não intramuscular, eliminando a alternativa B).",
    tags:["febre_amarela","vacina","imunizacao","bio_manguinhos"],fav:false},
 
-  {id:"i002",materia:"Imunização",assunto:"Imunidade Ativa e Passiva",banca:"EAGS",ano:2016,dific:2,tipo:"conceitual",
+  {id:"i002",materia:"Imunização",modulo:"Módulo 4: Imunização e Calendário Vacinal",assunto:"Imunidade Ativa e Passiva",banca:"EAGS",ano:2016,dific:2,tipo:"conceitual",
    enunciado:"Assinale a alternativa que completa corretamente as lacunas: A imunização ____________ é adquirida em consequência de uma infecção ou artificialmente, mediante a inoculação de agente imunogênico, que é___________.",
    alts:{a:"ativa – soro",b:"passiva – soro",c:"ativa – vacina",d:"passiva – vacina",e:"natural – antígeno"},gabarito:"c",
+   resolucao:"Imunidade <strong>Ativa</strong> é quando o próprio organismo do indivíduo produz a defesa em resposta a um antígeno (via vacina ou doença espontânea). O soro fornece proteção <strong>Passiva</strong> direta (anticorpos prontos).",
    tags:["imunidade_ativa","imunidade_passiva","vacina","soro"],fav:false},
 
-  {id:"i003",materia:"Imunização",assunto:"Vacina BCG",banca:"EsFCEx",ano:2019,dific:4,tipo:"clínico",
+  {id:"i003",materia:"Imunização",modulo:"Módulo 4: Imunização e Calendário Vacinal",assunto:"Vacina BCG",banca:"EsFCEx",ano:2019,dific:4,tipo:"clínico",
    enunciado:"Em relação à vacina BCG, assinale a alternativa correta.",
    alts:{a:"A vacina BCG é a única vacina do calendário nacional brasileiro cuja administração pode ser realizada pela via intradérmica.",b:"A BCG deve ser administrada na inserção inferior do músculo deltoide direito e NÃO pode ser administrada em outra região do corpo.",c:"O contato intradomiciliar de paciente com hanseníase MB, com menos de 1 ano, comprovadamente vacinado, não necessita de outra dose de BCG.",d:"A via intradérmica proporciona uma lenta absorção. O volume máximo a ser administrado por essa via é 0,1 mL.",e:"A vacina BCG pode ser administrada em recém-nascido com peso de até 2 kg."},gabarito:"d",
+   resolucao:"A via intradérmica é projetada para micro-absorção linfática lenta e possui o limite rígido de 0,1 mL. (A vacina é contraindicada para RN com menos de 2kg).",
    tags:["bcg","tuberculose","via_intradermica","volume"],fav:false},
 
-  {id:"i004",materia:"Imunização",assunto:"Vacina BCG",banca:"PM-MG",ano:2017,dific:2,tipo:"memorização",
+  {id:"i004",materia:"Imunização",modulo:"Módulo 4: Imunização e Calendário Vacinal",assunto:"Vacina BCG",banca:"PM-MG",ano:2017,dific:2,tipo:"memorização",
    enunciado:"A vacina BCG (bacilo de Calmette e Guérin) é apresentada sob a forma liofilizada em ampola multidose. Esta vacina está indicada para:",
    alts:{a:"Imunizar as crianças definitivamente contra a tuberculose.",b:"Prematuros ou crianças com peso inferior a 2 kg ao nascer.",c:"Prevenir as formas graves da tuberculose.",d:"Contatos intradomiciliares com menos de 1 ano de idade comprovadamente vacinados.",e:"Toda a população indígena a partir de 2 anos de idade."},gabarito:"c",
    tags:["bcg","tuberculose","indicacao"],fav:false},
 
-  {id:"i005",materia:"Imunização",assunto:"Vias de Administração",banca:"CSM",ano:2017,dific:2,tipo:"memorização",
+  {id:"i005",materia:"Imunização",modulo:"Módulo 4: Imunização e Calendário Vacinal",assunto:"Vias de Administração",banca:"CSM",ano:2017,dific:2,tipo:"memorização",
    enunciado:"Segundo o Manual de Vacinação do Ministério da Saúde (2014), qual é a via de administração da vacina meningocócica C (conjugada)?",
    alts:{a:"Intradérmica.",b:"Intramuscular.",c:"Subcutânea.",d:"Oral.",e:"Intratecal."},gabarito:"b",
    tags:["meningococica","via_intramuscular","vacina"],fav:false},
 
-  {id:"i006",materia:"Imunização",assunto:"Vias de Administração",banca:"CAP",ano:2011,dific:1,tipo:"memorização",
+  {id:"i006",materia:"Imunização",modulo:"Módulo 4: Imunização e Calendário Vacinal",assunto:"Vias de Administração",banca:"CAP",ano:2011,dific:1,tipo:"memorização",
    enunciado:"Qual a via de administração da vacina Tríplice Viral?",
    alts:{a:"Subcutânea",b:"Intramuscular.",c:"Oral.",d:"Intradérmica.",e:"Intravenosa."},gabarito:"a",
    tags:["triplice_viral","sarampo","caxumba","rubeola","via_subcutanea"],fav:false},
 
-  {id:"i007",materia:"Imunização",assunto:"Febre Amarela",banca:"IBADE",ano:2017,dific:3,tipo:"clínico",
+  {id:"i007",materia:"Imunização",modulo:"Módulo 4: Imunização e Calendário Vacinal",assunto:"Febre Amarela",banca:"IBADE",ano:2017,dific:3,tipo:"clínico",
    enunciado:"A respeito da vacina contra febre amarela, é correto afirmar que:",
    alts:{a:"A vacina é indicada para pessoa com doença autoimune.",b:"Gestantes e nutrizes podem ser vacinadas sem restrições.",c:"O volume de dose a ser administrada é de 1,9 mL por via intramuscular.",d:"Pode ser administrada simultaneamente com a varicela.",e:"É contraindicada para crianças menores de 6 meses de idade."},gabarito:"e",
    tags:["febre_amarela","contraindicacao","crianca","vacina"],fav:false},
 
-  {id:"i008",materia:"Imunização",assunto:"Rede de Frio",banca:"IBADE",ano:2017,dific:2,tipo:"memorização",
+  {id:"i008",materia:"Imunização",modulo:"Módulo 5: Vigilância em Saúde e Rede de Frio",assunto:"Rede de Frio",banca:"IBADE",ano:2017,dific:2,tipo:"memorização",
    enunciado:"De acordo com as recomendações do Ministério da Saúde, a temperatura de um refrigerador de uso doméstico utilizado para o armazenamento de imunobiológicos deve ser mantida entre:",
    alts:{a:"+2°C e +5°C",b:"-2°C e -6°C.",c:"-2°C e -8°C.",d:"+2°C e +6°C",e:"+2°C e +8°C"},gabarito:"e",
    tags:["rede_frio","temperatura","refrigerador","imunobiologico"],fav:false},
 
-  {id:"i009",materia:"Imunização",assunto:"Contraindicações",banca:"CSM",ano:2012,dific:2,tipo:"clínico",
+  {id:"i009",materia:"Imunização",modulo:"Módulo 4: Imunização e Calendário Vacinal",assunto:"Contraindicações",banca:"CSM",ano:2012,dific:2,tipo:"clínico",
    enunciado:"A vacinação será CONTRAINDICADA quando o paciente apresentar:",
    alts:{a:"Afecções das vias aéreas superiores.",b:"Antecedente familiar de convulsão.",c:"Doenças agudas febris graves.",d:"Vacinação contra raiva em andamento.",e:"Desnutrição."},gabarito:"c",
    tags:["contraindicacao","vacina","doenca_febril"],fav:false},
 
-  {id:"i010",materia:"Imunização",assunto:"Tríplice Viral",banca:"EsSA",ano:2016,dific:2,tipo:"memorização",
+  {id:"i010",materia:"Imunização",modulo:"Módulo 4: Imunização e Calendário Vacinal",assunto:"Tríplice Viral",banca:"EsSA",ano:2016,dific:2,tipo:"memorização",
    enunciado:"A tríplice viral é uma vacina combinada de vírus vivos atenuados contra o sarampo, a caxumba e a rubéola. Sobre este imunológico, marque a alternativa correta.",
    alts:{a:"É administrada aos 2, 4 e 6 meses de vida, com reforço aos 12 meses.",b:"Durante as campanhas de vacinação, pode ser administrada em gestantes.",c:"É administrada aos 3 e 5 meses, com reforço aos 15 meses.",d:"Deve ser conservada em geladeira entre +2ºC e +8ºC.",e:"A via de administração é intramuscular."},gabarito:"d",
    tags:["triplice_viral","conservacao","temperatura","calendario"],fav:false},
 
   // ── FUNDAMENTOS DE ENFERMAGEM ───────────────────
-  {id:"f001",materia:"Fundamentos de Enfermagem",assunto:"Sinais Vitais",banca:"ESA",ano:2011,dific:2,tipo:"clínico",
+  {id:"f001",materia:"Fundamentos de Enfermagem",modulo:"Módulo 6: Técnicas e Procedimentos Fundamentais",assunto:"Sinais Vitais",banca:"ESA",ano:2011,dific:2,tipo:"clínico",
    enunciado:"Quando um técnico de enfermagem examina o tórax, expõe o esterno e hemitórax esquerdo, localiza o quinto espaço intercostal na linha medioclavicular e coloca o diafragma do estetoscópio sobre o ápice cardíaco para auscultar bulhas cardíacas B1 e B2, ele está verificando que tipo de pulso?",
    alts:{a:"Femoral",b:"Pedioso",c:"Apical",d:"Radial",e:"Carotídeo"},gabarito:"c",
    tags:["pulso_apical","ausculta","sinais_vitais","bulhas_cardiacas"],fav:false},
 
-  {id:"f002",materia:"Fundamentos de Enfermagem",assunto:"Sondagem",banca:"ESA",ano:2011,dific:3,tipo:"clínico",
+  {id:"f002",materia:"Fundamentos de Enfermagem",modulo:"Módulo 6: Técnicas e Procedimentos Fundamentais",assunto:"Sondagem",banca:"ESA",ano:2011,dific:3,tipo:"clínico",
    enunciado:"Dentre os cuidados preconizados para a remoção de uma sonda nasogástrica de um determinado paciente, é INCORRETO afirmar que:",
    alts:{a:"A sonda poderá ser clampeada e desclampeada intermitentemente durante um período de 24 horas.",b:"Antes de ser removida, a sonda deve ser 'lavada' com 10ml de solução fisiológica ou água destilada.",c:"A sonda deve ser puxada delicada e lentamente, interrompendo-se sua retirada ao sinal de resistência.",d:"O paciente deve ser orientado a inspirar profundamente durante a remoção.",e:"A sonda deve ser removida em um único movimento suave e contínuo."},gabarito:"d",
    tags:["sonda_nasogastrica","cuidados","remocao"],fav:false},
 
-  {id:"f003",materia:"Fundamentos de Enfermagem",assunto:"Cateterismo Vesical",banca:"ESA",ano:2012,dific:2,tipo:"clínico",
+  {id:"f003",materia:"Fundamentos de Enfermagem",modulo:"Módulo 6: Técnicas e Procedimentos Fundamentais",assunto:"Cateterismo Vesical",banca:"ESA",ano:2012,dific:2,tipo:"clínico",
    enunciado:"O cateterismo vesical é um dos mais importantes fatores de risco para a infecção hospitalar. Como medida preventiva, a atitude mais indicada do técnico de enfermagem é:",
    alts:{a:"Trocar o cateter a cada sete dias.",b:"Usar luva ao abrir o sistema fechado.",c:"Substituir a drenagem aberta a cada 24 horas.",d:"Lavar as mãos sempre que manipular o sistema.",e:"Desconectar o cateter com frequência para verificar o fluxo."},gabarito:"d",
    tags:["cateterismo_vesical","infeccao_hospitalar","higiene_maos","prevencao"],fav:false},
 
-  {id:"f004",materia:"Fundamentos de Enfermagem",assunto:"Terminologia Técnica",banca:"ESA",ano:2013,dific:2,tipo:"memorização",
+  {id:"f004",materia:"Fundamentos de Enfermagem",modulo:"Módulo 6: Técnicas e Procedimentos Fundamentais",assunto:"Terminologia Técnica",banca:"ESA",ano:2013,dific:2,tipo:"memorização",
    enunciado:"Episódio de vômito sanguinolento, aspecto vermelho brilhante, apresentando-se como 'borra de café', possui como termo técnico:",
    alts:{a:"Melena",b:"Hemoptise",c:"Hematêmese",d:"Enterorragia",e:"Epistaxe"},gabarito:"c",
    tags:["terminologia","hematemese","vomito","sangue"],fav:false},
 
-  {id:"f005",materia:"Fundamentos de Enfermagem",assunto:"Sondagem",banca:"ESA",ano:2015,dific:2,tipo:"clínico",
-   enunciado:"Qual o método mais preciso para verificar o posicionamento da sonda nasogástrica?",
+  {id:"f005",materia:"Fundamentos de Enfermagem",modulo:"Módulo 6: Técnicas e Procedimentos Fundamentais",assunto:"Sondagem",banca:"ESA",ano:2015,dific:2,tipo:"clínico",
+   enunciado:"Qual o método mais preciso para verificar o positioning da sonda nasogástrica?",
    alts:{a:"Visualização radiológica da extremidade da sonda.",b:"Medida do comprimento exposto da sonda.",c:"Avaliação visual da cor do aspirado.",d:"Medida do pH aspirado.",e:"Ausculta de ar insuflado."},gabarito:"a",
    tags:["sonda_nasogastrica","posicionamento","radiologia","confirmacao"],fav:false},
 
-  {id:"f006",materia:"Fundamentos de Enfermagem",assunto:"Posicionamento no Leito",banca:"ESA",ano:2017,dific:1,tipo:"memorização",
+  {id:"f006",materia:"Fundamentos de Enfermagem",modulo:"Módulo 6: Técnicas e Procedimentos Fundamentais",assunto:"Posicionamento no Leito",banca:"ESA",ano:2017,dific:1,tipo:"memorização",
    enunciado:"'Esta posição facilita a respiração em caso de pacientes com problemas cardíacos e pulmonares, além de promover descanso e conforto'. Marque a alternativa que corresponde ao enunciado.",
    alts:{a:"Posição de Fowler",b:"Posição de Sims",c:"Posição de Trendelenburg",d:"Posição Genupeitoral",e:"Decúbito lateral"},gabarito:"a",
    tags:["posicao_fowler","posicionamento","cardio_pulmonar","conforto"],fav:false},
 
-  {id:"f007",materia:"Fundamentos de Enfermagem",assunto:"Nutrição Enteral",banca:"ESA",ano:2014,dific:3,tipo:"clínico",
+  {id:"f007",materia:"Fundamentos de Enfermagem",modulo:"Módulo 6: Técnicas e Procedimentos Fundamentais",assunto:"Nutrição Enteral",banca:"ESA",ano:2014,dific:3,tipo:"clínico",
    enunciado:"São tipos de vias de administração indicadas na terapia nutricional de longo prazo, além de reduzirem risco de aspiração:",
    alts:{a:"Parenteral e enteral",b:"Enteral e jejunostomias",c:"Gastrostomia ou jejunostomia",d:"Oral e parenteral",e:"Gastrectomia e jejunostomia"},gabarito:"c",
    tags:["nutricao_enteral","gastrostomia","jejunostomia","longo_prazo"],fav:false},
 
-  {id:"f008",materia:"Fundamentos de Enfermagem",assunto:"Sinais Vitais",banca:"ESA",ano:2015,dific:2,tipo:"memorização",
+  {id:"f008",materia:"Fundamentos de Enfermagem",modulo:"Módulo 6: Técnicas e Procedimentos Fundamentais",assunto:"Sinais Vitais",banca:"ESA",ano:2015,dific:2,tipo:"memorização",
    enunciado:"Qual o local mais adequado para aferição da temperatura corporal em paciente adulto inconsciente?",
    alts:{a:"Axilar",b:"Oral",c:"Retal",d:"Timpânico",e:"Inguinal"},gabarito:"c",
    tags:["temperatura","sinais_vitais","adulto","inconsciente"],fav:false},
 
   // ── CLÍNICA CIRÚRGICA ───────────────────────────
-  {id:"cc001",materia:"Clínica Cirúrgica",assunto:"Período Perioperatório",banca:"ESA",ano:2013,dific:3,tipo:"clínico",
+  {id:"cc001",materia:"Clínica Cirúrgica",modulo:"Módulo 7: Enfermagem Cirúrgica e Central de Materiais",assunto:"Período Perioperatório",banca:"ESA",ano:2013,dific:3,tipo:"clínico",
    enunciado:"Assinale a alternativa que constitui ação de enfermagem NO pré-operatório imediato de craniotomia:",
    alts:{a:"Administrar o medicamento pré-anestésico prescrito.",b:"Verificar e registrar os sinais vitais do paciente após retorno da sala cirúrgica.",c:"Orientar o paciente sobre o procedimento cirúrgico.",d:"Realizar tricotomia ampla do couro cabeludo.",e:"Monitorar o débito urinário a cada hora."},gabarito:"a",
    tags:["pre_operatorio","craniotomia","pre_anestesico","imediato"],fav:false},
 
-  {id:"cc002",materia:"Clínica Cirúrgica",assunto:"Classificação de Cirurgias",banca:"ESA",ano:2013,dific:2,tipo:"memorização",
+  {id:"cc002",materia:"Clínica Cirúrgica",modulo:"Módulo 7: Enfermagem Cirúrgica e Central de Materiais",assunto:"Classificação de Cirurgias",banca:"ESA",ano:2013,dific:2,tipo:"memorização",
    enunciado:"De acordo com a classificação do risco cirúrgico, a cirurgia de emergência é aquela realizada:",
-   alts:{a:"Em até 24 horas após a indicação.",b:"Com risco de vida imediato, sendo realizada em minutos.",c:"Dentro de um período de 30 dias.",d:"Após 7 dias da indicação médica.",e:"Quando não há risco imediato de vida, mas é necessária dentro de poucos dias."},gabarito:"b",
+   alts:{a:"Em até 24 horas após a indicação.",b:"Com risco de vida imediato, sendo realizada em minutos.",c:"Dentro de um período de 30 dias.",d:"Após 7 dias da indicação médica.",e:"When não há risco imediato de vida, mas é necessária dentro de poucos dias."},gabarito:"b",
    tags:["emergencia_cirurgica","classificacao","risco_cirurgico"],fav:false},
 
-  {id:"cc003",materia:"Clínica Cirúrgica",assunto:"Desinfecção e Esterilização",banca:"ESA",ano:2016,dific:3,tipo:"memorização",
+  {id:"cc003",materia:"Clínica Cirúrgica",modulo:"Módulo 7: Enfermagem Cirúrgica e Central de Materiais",assunto:"Desinfecção e Esterilização",banca:"ESA",ano:2016,dific:3,tipo:"memorização",
    enunciado:"Em relação à limpeza e desinfecção de artigos hospitalares, assinale a alternativa correta sobre a classificação de Spaulding para artigos críticos:",
    alts:{a:"Artigos que entram em contato com pele íntegra, não necessitam de esterilização.",b:"Artigos críticos penetram em tecidos estéreis ou sistema vascular e requerem esterilização.",c:"Artigos semicríticos entram em contato com mucosas não íntegras e necessitam de esterilização de alto nível.",d:"Artigos não críticos requerem desinfecção de alto nível.",e:"Artigos semicríticos incluem bisturis, agulhas e cateteres urinários."},gabarito:"b",
    tags:["spaulding","critico","esterilizacao","desinfeccao"],fav:false},
 
-  {id:"cc004",materia:"Clínica Cirúrgica",assunto:"Feridas e Curativos",banca:"ESA",ano:2014,dific:2,tipo:"conceitual",
+  {id:"cc004",materia:"Clínica Cirúrgica",modulo:"Módulo 7: Enfermagem Cirúrgica e Central de Materiais",assunto:"Feridas e Curativos",banca:"ESA",ano:2014,dific:2,tipo:"conceitual",
    enunciado:"A cicatrização que ocorre em feridas com bordas aproximadas, sem perda de tecido e com mínima contaminação bacteriana é chamada de:",
    alts:{a:"Cicatrização por segunda intenção",b:"Cicatrização por terceira intenção",c:"Cicatrização por primeira intenção",d:"Cicatrização por granulação",e:"Cicatrização retardada"},gabarito:"c",
    tags:["cicatrizacao","primeira_intencao","ferida","curativo"],fav:false},
 
   // ── PROGRAMAS DE SAÚDE ──────────────────────────
-  {id:"ps001",materia:"Programas de Saúde",assunto:"Saúde da Criança",banca:"ESA",ano:2015,dific:2,tipo:"memorização",
+  {id:"ps001",materia:"Programas de Saúde",modulo:"Módulo 8: Programas de Saúde Pública",assunto:"Saúde da Criança",banca:"ESA",ano:2015,dific:2,tipo:"memorização",
    enunciado:"De acordo com o Programa de Assistência Integral à Saúde da Criança (PAISC), o número de consultas de puericultura recomendadas no primeiro ano de vida é:",
    alts:{a:"2 consultas",b:"4 consultas",c:"6 consultas",d:"7 consultas",e:"12 consultas"},gabarito:"d",
    tags:["paisc","puericultura","crianca","consultas"],fav:false},
 
-  {id:"ps002",materia:"Programas de Saúde",assunto:"Prevenção Primária/Secundária",banca:"ESA",ano:2016,dific:3,tipo:"conceitual",
+  {id:"ps002",materia:"Programas de Saúde",modulo:"Módulo 8: Programas de Saúde Pública",assunto:"Prevenção Primária/Secundária",banca:"ESA",ano:2016,dific:3,tipo:"conceitual",
    enunciado:"Assinale a alternativa que apresenta exemplo de Prevenção Primária em saúde.",
    alts:{a:"Diagnóstico precoce de hipertensão arterial.",b:"Reabilitação de paciente após AVC.",c:"Vacinação contra influenza.",d:"Exame de Papanicolau.",e:"Tratamento de paciente com diabetes."},gabarito:"c",
    tags:["prevencao_primaria","vacinacao","niveis_prevencao"],fav:false},
 
-  {id:"ps003",materia:"Programas de Saúde",assunto:"Saúde da Mulher",banca:"ESA",ano:2014,dific:2,tipo:"memorização",
+  {id:"ps003",materia:"Programas de Saúde",modulo:"Módulo 8: Programas de Saúde Pública",assunto:"Saúde da Mulher",banca:"ESA",ano:2014,dific:2,tipo:"memorização",
    enunciado:"De acordo com o PAISM — Programa de Assistência Integral à Saúde da Mulher — o exame de colpocitologia oncótica (Papanicolau) deve ser realizado em mulheres:",
    alts:{a:"A partir dos 18 anos ou início da atividade sexual.",b:"A partir dos 25 anos, com início da atividade sexual.",c:"Somente após os 30 anos.",d:"A qualquer idade, sem restrição.",e:"Apenas nas que já tiveram filhos."},gabarito:"b",
    tags:["paism","papanicolau","cancer_colo","rastreamento"],fav:false},
 
   // ── ASSISTÊNCIA CLÍNICA ─────────────────────────
-  {id:"ac001",materia:"Enf. Clínica",assunto:"Distúrbios Cardiovasculares",banca:"ESA",ano:2016,dific:3,tipo:"clínico",
+  {id:"ac001",materia:"Enf. Clínica",modulo:"Módulo 9: Patologias e Enfermagem Clínica",assunto:"Distúrbios Cardiovasculares",banca:"ESA",ano:2016,dific:3,tipo:"clínico",
    enunciado:"Em relação ao Infarto Agudo do Miocárdio (IAM), assinale a alternativa que descreve CORRETAMENTE a dor típica desse evento:",
    alts:{a:"Dor pleurítica, que piora com a inspiração profunda.",b:"Dor precordial em aperto, de forte intensidade, podendo irradiar para o braço esquerdo, mandíbula e dorso.",c:"Dor abdominal difusa, de início súbito, acompanhada de náuseas.",d:"Dor lombar irradiada para membros inferiores.",e:"Dor de cabeça intensa, acompanhada de vômitos."},gabarito:"b",
    tags:["iam","infarto","dor_precordial","cardiovascular"],fav:false},
 
-  {id:"ac002",materia:"Enf. Clínica",assunto:"Distúrbios Respiratórios",banca:"ESA",ano:2017,dific:3,tipo:"clínico",
+  {id:"ac002",materia:"Enf. Clínica",modulo:"Módulo 9: Patologias e Enfermagem Clínica",assunto:"Distúrbios Respiratórios",banca:"ESA",ano:2017,dific:3,tipo:"clínico",
    enunciado:"Sobre a assistência de enfermagem ao paciente com insuficiência respiratória aguda, é correto afirmar:",
    alts:{a:"Posicionar o paciente em decúbito dorsal horizontal para facilitar a ventilação.",b:"Administrar oxigênio por máscara sem reinalação independentemente da saturação.",c:"Manter a cabeceira do leito elevada entre 30 e 45 graus para facilitar a ventilação.",d:"Restringir a ingestão de líquidos para evitar edema pulmonar.",e:"Incentivar a respiração rápida e superficial para aumentar a frequência respiratória."},gabarito:"c",
    tags:["insuficiencia_respiratoria","posicionamento","fowler","oxigenio"],fav:false},
 
-  {id:"ac003",materia:"Enf. Clínica",assunto:"Anemias",banca:"ESA",ano:2018,dific:3,tipo:"clínico",
+  {id:"ac003",materia:"Enf. Clínica",modulo:"Módulo 9: Patologias e Enfermagem Clínica",assunto:"Anemias",banca:"ESA",ano:2018,dific:3,tipo:"clínico",
    enunciado:"Sobre a anemia falciforme, marque a CORRETA:",
    alts:{a:"É causada por deficiência de vitamina B12.",b:"Caracteriza-se pela presença de hemácias em formato de foice, causando obstrução microvascular.",c:"É transmitida apenas por transfusão de sangue.",d:"Acomete exclusivamente crianças menores de 5 anos.",e:"O tratamento inclui reposição de ferro intravenoso."},gabarito:"b",
    tags:["anemia_falciforme","hemoglobina_s","hemolise","falcizacao"],fav:false},
 
   // ── VIGILÂNCIA EPIDEMIOLÓGICA ────────────────────
-  {id:"ve001",materia:"Vigilância Epidemiológica",assunto:"Doenças de Notificação",banca:"ESA",ano:2015,dific:2,tipo:"memorização",
+  {id:"ve001",materia:"Vigilância Epidemiológica",modulo:"Módulo 5: Vigilância em Saúde e Rede de Frio",assunto:"Doenças de Notificação",banca:"ESA",ano:2015,dific:2,tipo:"memorização",
    enunciado:"Qual das doenças abaixo é de NOTIFICAÇÃO COMPULSÓRIA IMEDIATA no Brasil?",
    alts:{a:"Diabetes mellitus",b:"Hipertensão arterial sistêmica",c:"Cólera",d:"Dengue clássica",e:"Varicela"},gabarito:"c",
    tags:["notificacao_compulsoria","colera","vigilancia","imediata"],fav:false},
 
-  {id:"ve002",materia:"Vigilância Epidemiológica",assunto:"Precauções e Isolamento",banca:"ESA",ano:2016,dific:3,tipo:"memorização",
+  {id:"ve002",materia:"Vigilância Epidemiológica",modulo:"Módulo 5: Vigilância em Saúde e Rede de Frio",assunto:"Precauções e Isolamento",banca:"ESA",ano:2016,dific:3,tipo:"memorização",
    enunciado:"O tipo de precaução indicado para pacientes com tuberculose pulmonar bacilífera é a precaução por:",
    alts:{a:"Contato",b:"Gotículas",c:"Aerossóis (aérea)",d:"Universais",e:"Proteção reversa"},gabarito:"c",
    tags:["tuberculose","isolamento","aerossol","precaucao_airada"],fav:false},
 
-  {id:"ve003",materia:"Vigilância Epidemiológica",assunto:"Animais Peçonhentos",banca:"ESA",ano:2014,dific:3,tipo:"memorização",
+  {id:"ve003",materia:"Vigilância Epidemiológica",modulo:"Módulo 5: Vigilância em Saúde e Rede de Frio",assunto:"Animais Peçonhentos",banca:"ESA",ano:2014,dific:3,tipo:"memorização",
    enunciado:"Em relação ao acidente ofídico por serpente do gênero Bothrops (jararaca), a manifestação clínica LOCAL mais característica é:",
    alts:{a:"Neurotoxicidade com ptose palpebral.",b:"Bloqueio neuromuscular periférico.",c:"Dor intensa, edema, equimose e necrose local.",d:"Hemólise intravascular maciça.",e:"Paralisias motoras ascendentes."},gabarito:"c",
    tags:["bothrops","jararaca","ofidismo","manifestacao_local"],fav:false},
 
   // ── MATERNO-INFANTIL ────────────────────────────
-  {id:"mi001",materia:"Materno-Infantil",assunto:"Planejamento Familiar",banca:"ESA",ano:2015,dific:2,tipo:"memorização",
+  {id:"mi001",materia:"Materno-Infantil",modulo:"Módulo 10: Saúde da Mulher e da Criança",assunto:"Planejamento Familiar",banca:"ESA",ano:2015,dific:2,tipo:"memorização",
    enunciado:"Assinale a alternativa que apresenta somente métodos CONTRACEPTIVOS IRREVERSÍVEIS:",
    alts:{a:"DIU e pílula anticoncepcional.",b:"Preservativo feminino e masculino.",c:"Ligadura tubária e vasectomia.",d:"Diafragma e espermicida.",e:"Injeção mensal e trimestral."},gabarito:"c",
    tags:["contracepção","ligadura","vasectomia","irreversivel"],fav:false},
 
-  {id:"mi002",materia:"Materno-Infantil",assunto:"Pré-Natal",banca:"ESA",ano:2019,dific:3,tipo:"clínico",
+  {id:"mi002",materia:"Materno-Infantil",modulo:"Módulo 10: Saúde da Mulher e da Criança",assunto:"Pré-Natal",banca:"ESA",ano:2019,dific:3,tipo:"clínico",
    enunciado:"A necessidade de contracepção de emergência está indicada quando:",
    alts:{a:"A mulher deseja simplesmente evitar a gravidez de forma rotineira.",b:"Houve relação sexual desprotegida ou falha do método contraceptivo utilizado.",c:"A mulher tem contraindicação ao uso de anticoncepcional oral combinado.",d:"A mulher está amamentando.",e:"O casal decide adiar a gravidez por razões pessoais."},gabarito:"b",
    tags:["contracepcao_emergencia","relacao_desprotegida","pos_coital"],fav:false},
 
-  {id:"mi003",materia:"Materno-Infantil",assunto:"Complicações na Gravidez",banca:"ESA",ano:2018,dific:3,tipo:"clínico",
+  {id:"mi003",materia:"Materno-Infantil",modulo:"Módulo 10: Saúde da Mulher e da Criança",assunto:"Complicações na Gravidez",banca:"ESA",ano:2018,dific:3,tipo:"clínico",
    enunciado:"Esta complicação clínica na gestação é caracterizada por hipertensão arterial associada a proteinúria, podendo progredir para eclâmpsia. Trata-se de:",
    alts:{a:"Diabete gestacional",b:"Hiperemese gravídica",c:"Placenta prévia",d:"Pré-eclâmpsia",e:"Descolamento prematuro de placenta"},gabarito:"d",
    tags:["pre_eclampsia","hipertensao","proteinuria","gestacao"],fav:false},
 
   // ── LEGISLAÇÃO SUS / ECA ─────────────────────────
-  {id:"ls001",materia:"Legislação SUS/ECA",assunto:"Lei 8.080/90",banca:"ESA",ano:2013,dific:2,tipo:"legislação",
+  {id:"ls001",materia:"Legislação SUS/ECA",modulo:"Módulo 11: SUS e Legislação Social",assunto:"Lei 8.080/90",banca:"ESA",ano:2013,dific:2,tipo:"legislação",
    enunciado:"O órgão público que fiscaliza a movimentação dos recursos do SUS é:",
    alts:{a:"Conselho Nacional de Saúde",b:"Ministério da Saúde",c:"Conselho Nacional de Secretários de Saúde (CONASS)",d:"Fundo Nacional de Saúde",e:"Agência Nacional de Saúde Suplementar (ANS)"},gabarito:"d",
    tags:["sus","financiamento","fundo_nacional_saude","lei_8080"],fav:false},
 
-  {id:"ls002",materia:"Legislação SUS/ECA",assunto:"Lei 8.080/90",banca:"ESA",ano:2014,dific:3,tipo:"legislação",
+  {id:"ls002",materia:"Legislação SUS/ECA",modulo:"Módulo 11: SUS e Legislação Social",assunto:"Lei 8.080/90",banca:"ESA",ano:2014,dific:3,tipo:"legislação",
    enunciado:"A direção estadual do Sistema Único de Saúde é exercida pela:",
    alts:{a:"Secretaria Municipal de Saúde.",b:"Secretaria Estadual de Saúde.",c:"Ministério da Saúde.",d:"CONASS.",e:"Conselho Estadual de Saúde."},gabarito:"b",
    tags:["sus","direcao_estadual","lei_8080","organizacao"],fav:false},
 
-  {id:"ls003",materia:"Legislação SUS/ECA",assunto:"ECA",banca:"ESA",ano:2016,dific:2,tipo:"legislação",
+  {id:"ls003",materia:"Legislação SUS/ECA",modulo:"Módulo 11: SUS e Legislação Social",assunto:"ECA",banca:"ESA",ano:2016,dific:2,tipo:"legislação",
    enunciado:"Verificado o ato infracional praticado por adolescente, a autoridade competente poderá aplicar a medida socioeducativa de internação, que é de privação de liberdade e deve ser cumprida em:",
    alts:{a:"Delegacia de menores.",b:"Presídio comum, em ala separada.",c:"Estabelecimento educacional.",d:"Casa de custódia.",e:"Qualquer local determinado pelo juiz."},gabarito:"c",
    tags:["eca","ato_infracional","internacao","adolescente","socioeducativo"],fav:false},
 
   // ── CÁLCULO DE MEDICAMENTOS ─────────────────────
-  {id:"cm001",materia:"Cálculo de Medicamentos",assunto:"Gotejamento",banca:"ESA",ano:2017,dific:3,tipo:"cálculo",
+  {id:"cm001",materia:"Cálculo de Medicamentos",modulo:"Módulo 12: Matemática da Saúde e Farmacologia",assunto:"Gotejamento",banca:"ESA",ano:2017,dific:3,tipo:"cálculo",
    enunciado:"O médico prescreveu 500 ml de soro fisiológico 0,9% para ser infundido em 4 horas por macrogotas. O gotejamento por minuto deve ser de:",
    alts:{a:"16 gotas/min",b:"21 gotas/min",c:"28 gotas/min",d:"33 gotas/min",e:"42 gotas/min"},gabarito:"b",
    tags:["gotejamento","soro_fisiologico","macrogotas","calculo_infusao"],fav:false},
 
-  {id:"cm002",materia:"Cálculo de Medicamentos",assunto:"Cálculo de Insulina",banca:"ESA",ano:2018,dific:4,tipo:"cálculo",
+  {id:"cm002",materia:"Cálculo de Medicamentos",modulo:"Módulo 12: Matemática da Saúde e Farmacologia",assunto:"Cálculo de Insulina",banca:"ESA",ano:2018,dific:4,tipo:"cálculo",
    enunciado:"O médico prescreveu insulina NPH 30 UI para aplicação via subcutânea. A ampola disponível contém 100 UI/mL em frasco de 10 mL. Quantos mL devem ser aspirados?",
    alts:{a:"0,1 mL",b:"0,2 mL",c:"0,3 mL",d:"0,4 mL",e:"0,5 mL"},gabarito:"c",
    tags:["insulina","nph","calculo","subcutanea","ui"],fav:false},
 
   // ── FARMACOLOGIA ────────────────────────────────
-  {id:"fa001",materia:"Farmacologia",assunto:"Interação Medicamentosa",banca:"ESA",ano:2019,dific:3,tipo:"conceitual",
+  {id:"fa001",materia:"Farmacologia",modulo:"Módulo 12: Matemática da Saúde e Farmacologia",assunto:"Interação Medicamentosa",banca:"ESA",ano:2019,dific:3,tipo:"conceitual",
    enunciado:"É denominada de sinergismo a interação medicamentosa em que:",
    alts:{a:"Um medicamento inibe o efeito do outro.",b:"Os efeitos dos medicamentos se anulam mutuamente.",c:"Dois medicamentos com ações semelhantes produzem efeito maior quando combinados.",d:"Um medicamento acelera o metabolismo do outro.",e:"Os medicamentos não interagem entre si."},gabarito:"c",
    tags:["sinergismo","interacao_medicamentosa","farmacologia"],fav:false},
 
-  {id:"fa002",materia:"Farmacologia",assunto:"Vias de Administração",banca:"ESA",ano:2018,dific:2,tipo:"memorização",
+  {id:"fa002",materia:"Farmacologia",modulo:"Módulo 12: Matemática da Saúde e Farmacologia",assunto:"Vias de Administração",banca:"ESA",ano:2018,dific:2,tipo:"memorização",
    enunciado:"A via de administração que permite ação farmacológica mais RÁPIDA é:",
    alts:{a:"Oral",b:"Subcutânea",c:"Intramuscular",d:"Intravenosa",e:"Sublingual"},gabarito:"d",
    tags:["via_intravenosa","acao_rapida","farmacologia","administracao"],fav:false},
 
   // ── SAÚDE MENTAL ────────────────────────────────
-  {id:"sm001",materia:"Saúde Mental",assunto:"Transtornos de Humor",banca:"ESA",ano:2015,dific:3,tipo:"clínico",
+  {id:"sm001",materia:"Saúde Mental",modulo:"Módulo 13: Saúde Mental e Psiquiatria",assunto:"Transtornos de Humor",banca:"ESA",ano:2015,dific:3,tipo:"clínico",
    enunciado:"O transtorno caracterizado por ciclos alternados de episódios de depressão e mania recebe o nome de:",
    alts:{a:"Esquizofrenia",b:"Transtorno Bipolar",c:"Transtorno de Personalidade Borderline",d:"Ciclotimia Grave",e:"Distimia"},gabarito:"b",
    tags:["bipolar","mania","depressao","transtorno_humor"],fav:false},
 
-  {id:"sm002",materia:"Saúde Mental",assunto:"CAPS",banca:"ESA",ano:2016,dific:2,tipo:"memorização",
+  {id:"sm002",materia:"Saúde Mental",modulo:"Módulo 13: Saúde Mental e Psiquiatria",assunto:"CAPS",banca:"ESA",ano:2016,dific:2,tipo:"memorização",
    enunciado:"O CAPS III (Centro de Atenção Psicossocial) se diferencia dos demais tipos de CAPS principalmente porque:",
    alts:{a:"Atende exclusivamente crianças e adolescentes.",b:"Funciona 24 horas, incluindo finais de semana e feriados.",c:"Atende somente usuários de álcool e drogas.",d:"Funciona apenas durante o horário comercial.",e:"É destinado ao tratamento de idosos com demência."},gabarito:"b",
    tags:["caps_iii","24_horas","saude_mental","psicossocial"],fav:false},
 
   // ── EPI E BIOSSEGURANÇA ─────────────────────────
-  {id:"ep001",materia:"EPI e Biossegurança",assunto:"Precauções Padrão",banca:"ESA",ano:2018,dific:2,tipo:"memorização",
+  {id:"ep001",materia:"EPI e Biossegurança",modulo:"Módulo 14: Biossegurança e Controle de Infecções",assunto:"Precauções Padrão",banca:"ESA",ano:2018,dific:2,tipo:"memorização",
    enunciado:"Sobre a paramentação (colocação de EPI), a sequência CORRETA de colocação dos equipamentos é:",
    alts:{a:"Luvas → máscara → avental → óculos",b:"Máscara → óculos/protetor facial → avental → luvas",c:"Avental → luvas → máscara → óculos",d:"Óculos → avental → luvas → máscara",e:"Luvas → avental → óculos → máscara"},gabarito:"b",
    tags:["epi","paramentacao","sequencia","colocacao","biosseguranca"],fav:false},
 
-  {id:"ep002",materia:"EPI e Biossegurança",assunto:"Precauções Padrão",banca:"ESA",ano:2019,dific:2,tipo:"memorização",
+  {id:"ep002",materia:"EPI e Biossegurança",modulo:"Módulo 14: Biossegurança e Controle de Infecções",assunto:"Precauções Padrão",banca:"ESA",ano:2019,dific:2,tipo:"memorização",
    enunciado:"A máscara de proteção respiratória N95 está indicada principalmente para:",
    alts:{a:"Procedimentos cirúrgicos de rotina.",b:"Proteção contra respingos de sangue.",c:"Contato com pacientes com tuberculose pulmonar bacilífera.",d:"Higiene das mãos em procedimentos invasivos.",e:"Proteção do paciente contra infecções do profissional."},gabarito:"c",
    tags:["n95","mascara","tuberculose","aerossol","epi"],fav:false},
 
   // ── DIABETES / HIPERTENSÃO ──────────────────────
-  {id:"dh001",materia:"Diabetes e Hipertensão",assunto:"Diabetes Mellitus",banca:"ESA",ano:2017,dific:3,tipo:"clínico",
+  {id:"dh001",materia:"Diabetes e Hipertensão",modulo:"Módulo 9: Patologias e Enfermagem Clínica",assunto:"Diabetes Mellitus",banca:"ESA",ano:2017,dific:3,tipo:"clínico",
    enunciado:"O Sistema Endócrino tem por função secretar hormônios que regulam diversas funções do organismo. O hormônio responsável pela captação de glicose pelas células é:",
    alts:{a:"Glucagon",b:"Adrenalina",c:"Insulina",d:"Cortisol",e:"Hormônio do crescimento"},gabarito:"c",
    tags:["insulina","diabetes","glicose","sistema_endocrino"],fav:false},
 
-  {id:"dh002",materia:"Diabetes e Hipertensão",assunto:"Hipertensão Arterial",banca:"ESA",ano:2018,dific:2,tipo:"memorização",
+  {id:"dh002",materia:"Diabetes e Hipertensão",modulo:"Módulo 9: Patologias e Enfermagem Clínica",assunto:"Hipertensão Arterial",banca:"ESA",ano:2018,dific:2,tipo:"memorização",
    enunciado:"Segundo as Diretrizes Brasileiras de Hipertensão Arterial, o principal fator de risco não modificável para hipertensão é:",
    alts:{a:"Obesidade",b:"Sedentarismo",c:"Tabagismo",d:"Idade",e:"Consumo de sódio"},gabarito:"d",
    tags:["hipertensao","fator_risco","nao_modificavel","idade"],fav:false},
@@ -959,10 +996,10 @@ const DB = [
 // STATE
 // =====================================================
 let state = {
-  filters: { materia: '', banca: '', dific: '', especial: '' },
+  filters: { modulo: '', materia: '', banca: '', dific: '', especial: '' },
   historico: JSON.parse(localStorage.getItem('hist') || '{}'),
   favoritas: JSON.parse(localStorage.getItem('favs') || '[]'),
-  sim: { questions: [], current: 0, respostas: {}, modo: 'normal' },
+  sim: { questions: [], current: 0, respostas: {}, modo: 'normal', modulo: '' },
   expandedAll: false
 };
 
@@ -978,10 +1015,30 @@ function init() {
 }
 
 function buildSidebar() {
-  const materias = [...new Set(DB.map(q => q.materia))];
-  const bancas = [...new Set(DB.map(q => q.banca))];
+  const modulos = [...new Set(DB.map(q => q.modulo || 'Sem Módulo'))].sort();
+  const materias = [...new Set(DB.map(q => q.materia))].sort();
+  const bancas = [...new Set(DB.map(q => q.banca))].sort();
 
+  // Modulos Sidebar
+  const fmod = document.getElementById('filter-modulo');
+  const fmod2 = document.getElementById('sim-modulo');
+  document.getElementById('cnt-mod-all').textContent = DB.length;
+  modulos.forEach(m => {
+    const cnt = DB.filter(q => q.modulo === m).length;
+    const btn = document.createElement('button');
+    btn.className = 'filter-btn';
+    btn.innerHTML = `${m} <span class="count">${cnt}</span>`;
+    btn.onclick = () => setFilter('modulo', m, btn);
+    fmod.appendChild(btn);
+
+    const opt = document.createElement('option');
+    opt.value = m; opt.textContent = m;
+    fmod2.appendChild(opt);
+  });
+
+  // Materias Sidebar
   const fm = document.getElementById('filter-materia');
+  const fm2 = document.getElementById('sim-materia');
   document.getElementById('cnt-all').textContent = DB.length;
   materias.forEach(m => {
     const cnt = DB.filter(q => q.materia === m).length;
@@ -991,11 +1048,15 @@ function buildSidebar() {
     btn.innerHTML = `${m} <span class="count">${cnt}</span>`;
     btn.onclick = () => setFilter('materia', m, btn);
     fm.appendChild(btn);
+
+    const opt = document.createElement('option');
+    opt.value = m; opt.textContent = m;
+    fm2.appendChild(opt);
   });
 
+  // Bancas Sidebar
   const fb = document.getElementById('filter-banca');
   const fb2 = document.getElementById('sim-banca');
-  const fm2 = document.getElementById('sim-materia');
   bancas.forEach(b => {
     const btn = document.createElement('button');
     btn.className = 'filter-btn';
@@ -1006,11 +1067,6 @@ function buildSidebar() {
     opt.value = b; opt.textContent = b;
     fb2.appendChild(opt);
   });
-  materias.forEach(m => {
-    const opt = document.createElement('option');
-    opt.value = m; opt.textContent = m;
-    fm2.appendChild(opt);
-  });
 }
 
 // =====================================================
@@ -1019,12 +1075,26 @@ function buildSidebar() {
 function setFilter(type, val, el) {
   state.filters[type] = val;
   if (type === 'especial') {
-    ['materia','banca','dific'].forEach(k => state.filters[k] = '');
+    ['modulo','materia','banca','dific'].forEach(k => state.filters[k] = '');
   } else {
     state.filters.especial = '';
+    // Reseta filtros cruzados da barra lateral para não gerar conflito vazio involuntário
+    if(type === 'modulo') { state.filters.materia = ''; state.filters.banca = ''; }
+    if(type === 'materia') { state.filters.modulo = ''; state.filters.banca = ''; }
   }
-  // update active buttons in sidebar
-  const parent = el.closest('.filter-group, .sidebar-section');
+  
+  // Limpar seleções ativas visuais que não pertencem ao grupo atual
+  const allSections = el.closest('#sidebar').querySelectorAll('.sidebar-section');
+  allSections.forEach(sec => {
+    if (!sec.contains(el)) {
+      sec.querySelectorAll('.filter-btn').forEach(b => {
+        if(b.textContent.includes('Todas') || b.textContent.includes('Todos')) b.classList.add('active');
+        else b.classList.remove('active');
+      });
+    }
+  });
+
+  const parent = el.closest('.filter-group');
   if (parent) parent.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
   renderList();
@@ -1032,19 +1102,20 @@ function setFilter(type, val, el) {
 
 function getFiltered() {
   let qs = [...DB];
-  const {materia, banca, dific, especial} = state.filters;
+  const {modulo, materia, banca, dific, especial} = state.filters;
 
   if (especial === 'favoritas') qs = qs.filter(q => state.favoritas.includes(q.id));
   else if (especial === 'erradas') qs = qs.filter(q => (state.historico[q.id]?.erros||0) > 0).sort((a,b) => (state.historico[b.id]?.erros||0)-(state.historico[a.id]?.erros||0));
   else if (especial === 'naorespond') qs = qs.filter(q => !state.historico[q.id]);
   else {
+    if (modulo) qs = qs.filter(q => q.modulo === modulo);
     if (materia) qs = qs.filter(q => q.materia === materia);
     if (banca) qs = qs.filter(q => q.banca === banca);
     if (dific) qs = qs.filter(q => q.dific == dific);
   }
 
   const search = document.getElementById('search-input').value.toLowerCase();
-  if (search) qs = qs.filter(q => q.enunciado.toLowerCase().includes(search) || (q.tags||[]).join(' ').includes(search) || q.assunto.toLowerCase().includes(search));
+  if (search) qs = qs.filter(q => q.enunciado.toLowerCase().includes(search) || (q.tags||[]).join(' ').includes(search) || q.assunto.toLowerCase().includes(search) || (q.modulo && q.modulo.toLowerCase().includes(search)));
 
   const sort = document.getElementById('sort-select')?.value || 'default';
   if (sort === 'banca') qs.sort((a,b) => a.banca.localeCompare(b.banca));
@@ -1055,14 +1126,12 @@ function getFiltered() {
   return qs;
 }
 
-let globalIndex = 0;
 function renderList() {
   const qs = getFiltered();
   const list = document.getElementById('questions-list');
   const info = document.getElementById('results-info');
   info.textContent = `${qs.length} questão${qs.length !== 1 ? 'ões' : ''} encontrada${qs.length !== 1 ? 's' : ''}`;
   list.innerHTML = '';
-  globalIndex = 0;
   qs.forEach((q, i) => list.appendChild(buildCard(q, i+1)));
   updatePills();
 }
@@ -1082,6 +1151,7 @@ function buildCard(q, num) {
 
   const bancaClass = `tag tag-banca`;
   const difClass = `tag tag-dif-${q.dific}`;
+  const modHtml = q.modulo ? `<span class="tag tag-modulo">${q.modulo}</span>` : '';
 
   let statsHtml = '';
   if (hist.total) {
@@ -1089,12 +1159,16 @@ function buildCard(q, num) {
     statsHtml = `<span class="tag" style="background:rgba(255,255,255,0.05);color:var(--text3);border:1px solid var(--border)">${hist.acertos}/${hist.total} (${pct}%)</span>`;
   }
 
+  // Bloco de resolução condicional
+  const resolucaoTexto = q.resolucao ? q.resolucao : "Nenhuma resolução detalhada cadastrada para esta questão ainda.";
+
   card.innerHTML = `
     <div class="q-header">
       <span class="q-num">#${String(num).padStart(3,'0')}</span>
       <div class="q-meta">
         <span class="${bancaClass}">${q.banca} ${q.ano}</span>
         <span class="tag tag-materia">${q.materia}</span>
+        ${modHtml}
         <span class="${difClass}">${difLabel(q.dific)}</span>
         ${statsHtml}
       </div>
@@ -1111,7 +1185,11 @@ function buildCard(q, num) {
           <span>${v}</span>
         </button>`).join('')}
     </div>
-    <div class="q-gabarito" id="gab-${q.id}">✓ Resposta correta: <strong>${q.gabarito.toUpperCase()}) ${q.alts[q.gabarito]}</strong></div>
+    <div class="q-gabarito" id="gab-${q.id}">
+       <div class="gab-headline">✓ Resposta correta: ${q.gabarito.toUpperCase()})</div>
+       <div style="color: var(--green); margin-bottom:4px;">${q.alts[q.gabarito]}</div>
+       <div class="gab-resolucao"><strong>Explicação/Gabarito Comentado:</strong><br>${resolucaoTexto}</div>
+    </div>
   `;
 
   card.addEventListener('click', (e) => {
@@ -1185,6 +1263,7 @@ function toggleFav(qid, e) {
 function startSimuladoRapido() {
   showPanel('simulado');
   document.getElementById('sim-qtd').value = '10';
+  document.getElementById('sim-modulo').value = '';
   document.getElementById('sim-materia').value = '';
   document.getElementById('sim-banca').value = '';
   startSimulado();
@@ -1192,11 +1271,13 @@ function startSimuladoRapido() {
 
 function startSimulado() {
   const qtd = parseInt(document.getElementById('sim-qtd').value);
+  const mod = document.getElementById('sim-modulo').value;
   const mat = document.getElementById('sim-materia').value;
   const ban = document.getElementById('sim-banca').value;
   const modo = document.getElementById('sim-modo').value;
 
   let pool = [...DB];
+  if (mod) pool = pool.filter(q => q.modulo === mod);
   if (mat) pool = pool.filter(q => q.materia === mat);
   if (ban) pool = pool.filter(q => q.banca === ban);
 
@@ -1210,6 +1291,11 @@ function startSimulado() {
   state.sim.current = 0;
   state.sim.respostas = {};
   state.sim.modo = modo;
+
+  if(state.sim.questions.length === 0) {
+     alert("Nenhuma questão localizada para esse cruzamento de filtros.");
+     return;
+  }
 
   document.getElementById('sim-setup').style.display = 'none';
   document.getElementById('sim-running').style.display = 'flex';
@@ -1246,11 +1332,17 @@ function renderSimQ() {
   let gabHtml = '';
   if (revealed) {
     const acertou = respostaAtual === q.gabarito;
-    gabHtml = `<div style="margin-top:12px;padding:10px 14px;border-radius:8px;font-size:12px;font-family:var(--mono);
-      background:${acertou ? 'rgba(52,211,153,0.08)' : 'rgba(248,113,113,0.08)'};
-      border:1px solid ${acertou ? 'rgba(52,211,153,0.3)' : 'rgba(248,113,113,0.3)'};
-      color:${acertou ? 'var(--green)' : 'var(--red)'}">
-      ${acertou ? '✓ Correto!' : `✗ Errou — Resposta: ${q.gabarito.toUpperCase()}) ${q.alts[q.gabarito]}`}
+    const resTexto = q.resolucao ? q.resolucao : "Nenhuma resolução comentada disponível.";
+    gabHtml = `<div style="margin-top:12px;padding:14px;border-radius:8px;font-size:13px;line-height:1.6;
+      background:${acertou ? 'rgba(52,211,153,0.05)' : 'rgba(248,113,113,0.05)'};
+      border:1px solid ${acertou ? 'rgba(52,211,153,0.25)' : 'rgba(248,113,113,0.25)'};
+      color: var(--text);">
+      <span style="color:${acertou ? 'var(--green)' : 'var(--red)'}; font-weight:600; font-family:var(--mono);">
+        ${acertou ? '✓ Correto!' : `✗ Errou — Resposta: ${q.gabarito.toUpperCase()})`}
+      </span>
+      <div style="margin-top:8px; border-top:1px solid var(--border); padding-top:8px; color:var(--text2);">
+         <strong>Explicação:</strong><br>${resTexto}
+      </div>
     </div>`;
   }
 
@@ -1258,6 +1350,7 @@ function renderSimQ() {
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
       <span class="tag tag-banca">${q.banca} ${q.ano}</span>
       <span class="tag tag-materia">${q.materia}</span>
+      ${q.modulo ? `<span class="tag tag-modulo">${q.modulo}</span>` : ''}
     </div>
     <div class="sim-q-enunciado">${q.enunciado}</div>
     <div style="display:flex;flex-direction:column;gap:6px;">${altsHtml}</div>
