@@ -228,6 +228,7 @@ body {
   transition: all 0.2s;
 }
 .question-card:hover { border-color: var(--border2); box-shadow: var(--shadow-md); }
+.question-card.answered { opacity: 0.95; }
 
 .card-header {
   display: flex;
@@ -257,6 +258,7 @@ body {
 .badge-materia { background: #ecfdf5; border-color: #a7f3d0; color: #065f46; }
 .badge-dificil { background: #fef3c7; border-color: #fde68a; color: #92400e; }
 .badge-muito-dificil { background: #fee2e2; border-color: #fecaca; color: #991b1b; }
+.badge-answered { background: #e2e3e5; color: #6c757d; }
 
 .card-actions {
   display: flex;
@@ -305,6 +307,7 @@ body {
   border: 1px solid transparent;
 }
 .alt-item:hover:not(.disabled) { background: var(--gray-light); }
+.alt-item.disabled { cursor: default; opacity: 0.7; }
 .alt-item.selected-correct {
   background: var(--green-light);
   border-color: var(--green);
@@ -451,6 +454,19 @@ body {
 }
 .search-input:focus { border-color: var(--primary); }
 .search-input::placeholder { color: var(--text3); }
+
+/* Badge para filtro ativo persistente */
+.filter-reset {
+  margin-top: 12px;
+  padding: 6px 10px;
+  background: var(--gray-light);
+  border-radius: var(--radius-sm);
+  text-align: center;
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--text3);
+}
+.filter-reset:hover { background: #fee2e2; color: var(--red); }
 </style>
 </head>
 <body>
@@ -492,6 +508,9 @@ body {
     <div class="filter-section">
       <div class="filter-title">⭐ ESPECIAIS</div>
       <div class="filter-list" id="filter-especiais"></div>
+    </div>
+    <div class="filter-section">
+      <div class="filter-reset" onclick="resetarTodosFiltros()">🗑️ Limpar todos os filtros</div>
     </div>
   </aside>
 
@@ -570,17 +589,33 @@ for (let i = 0; i < 530; i++) {
     banca: bancasLista[i % bancasLista.length],
     ano: 2010 + (i % 14),
     dificuldade: 1 + (i % 5),
-    enunciado: i < QUESTOES_BASE.length ? base.enunciado : base.enunciado + ` (Questão ${i+1})`,
+    enunciado: i < QUESTOES_BASE.length ? base.enunciado : base.enunciado,
   });
 }
 
-// STATE
+// =====================================================
+// STATE COM PERSISTÊNCIA DOS FILTROS
+// =====================================================
+// Carregar filtros salvos do localStorage
+const savedFilters = localStorage.getItem('esa_filters');
 let state = {
-  filters: { materia: null, banca: null, ano: null, dificuldade: null, especial: null },
+  filters: savedFilters ? JSON.parse(savedFilters) : { materia: null, banca: null, ano: null, dificuldade: null, especial: null },
   historico: JSON.parse(localStorage.getItem('hist_esa') || '{}'),
   favoritas: JSON.parse(localStorage.getItem('favs_esa') || '[]'),
-  sim: { questoes: [], atual: 0, respostas: {}, modo: 'imediato' }
+  sim: { questoes: [], atual: 0, respostas: {}, modo: 'imediato' },
+  answering: false
 };
+
+function salvarFiltros() {
+  localStorage.setItem('esa_filters', JSON.stringify(state.filters));
+}
+
+function resetarTodosFiltros() {
+  state.filters = { materia: null, banca: null, ano: null, dificuldade: null, especial: null };
+  salvarFiltros();
+  renderizarFiltros(); // Re-renderiza os filtros para remover a classe active
+  renderizarQuestoes();
+}
 
 function init() {
   renderizarFiltros();
@@ -591,25 +626,38 @@ function init() {
 
 function renderizarFiltros() {
   const materias = [...new Set(questoesDB.map(q => q.materia))];
-  document.getElementById('filter-materias').innerHTML = `<div class="filter-item active" data-materia="todas" onclick="setFiltro('materia',null,this)">📚 Todas <span class="count">${questoesDB.length}</span></div>` + materias.map(m => `<div class="filter-item" data-materia="${m}" onclick="setFiltro('materia','${m}',this)">📌 ${m} <span class="count">${questoesDB.filter(q=>q.materia===m).length}</span></div>`).join('');
+  const containerMaterias = document.getElementById('filter-materias');
+  containerMaterias.innerHTML = `<div class="filter-item ${!state.filters.materia ? 'active' : ''}" data-materia="todas" onclick="setFiltro('materia',null,this)">📚 Todas <span class="count">${questoesDB.length}</span></div>` + 
+    materias.map(m => `<div class="filter-item ${state.filters.materia === m ? 'active' : ''}" data-materia="${m}" onclick="setFiltro('materia','${m}',this)">📌 ${m} <span class="count">${questoesDB.filter(q=>q.materia===m).length}</span></div>`).join('');
   
   const bancas = [...new Set(questoesDB.map(q => q.banca))];
-  document.getElementById('filter-bancas').innerHTML = `<div class="filter-item active" data-banca="todas" onclick="setFiltro('banca',null,this)">🏛 Todas <span class="count">${questoesDB.length}</span></div>` + bancas.map(b => `<div class="filter-item" data-banca="${b}" onclick="setFiltro('banca','${b}',this)">🏛 ${b} <span class="count">${questoesDB.filter(q=>q.banca===b).length}</span></div>`).join('');
+  const containerBancas = document.getElementById('filter-bancas');
+  containerBancas.innerHTML = `<div class="filter-item ${!state.filters.banca ? 'active' : ''}" data-banca="todas" onclick="setFiltro('banca',null,this)">🏛 Todas <span class="count">${questoesDB.length}</span></div>` + 
+    bancas.map(b => `<div class="filter-item ${state.filters.banca === b ? 'active' : ''}" data-banca="${b}" onclick="setFiltro('banca','${b}',this)">🏛 ${b} <span class="count">${questoesDB.filter(q=>q.banca===b).length}</span></div>`).join('');
   
   const anos = [...new Set(questoesDB.map(q => q.ano))].sort((a,b)=>b-a);
-  document.getElementById('filter-anos').innerHTML = `<div class="filter-item active" data-ano="todas" onclick="setFiltro('ano',null,this)">📅 Todos <span class="count">${questoesDB.length}</span></div>` + anos.map(a => `<div class="filter-item" data-ano="${a}" onclick="setFiltro('ano','${a}',this)">📅 ${a} <span class="count">${questoesDB.filter(q=>q.ano===a).length}</span></div>`).join('');
+  const containerAnos = document.getElementById('filter-anos');
+  containerAnos.innerHTML = `<div class="filter-item ${!state.filters.ano ? 'active' : ''}" data-ano="todas" onclick="setFiltro('ano',null,this)">📅 Todos <span class="count">${questoesDB.length}</span></div>` + 
+    anos.map(a => `<div class="filter-item ${state.filters.ano == a ? 'active' : ''}" data-ano="${a}" onclick="setFiltro('ano','${a}',this)">📅 ${a} <span class="count">${questoesDB.filter(q=>q.ano===a).length}</span></div>`).join('');
   
   const dificuldades = [{v:null,n:"Todas"},{v:1,n:"🟢 Fácil"},{v:2,n:"🟢 Médio-fácil"},{v:3,n:"🟡 Médio"},{v:4,n:"🔴 Difícil"},{v:5,n:"🔴 Muito difícil"}];
-  document.getElementById('filter-dificuldades').innerHTML = dificuldades.map(d => `<div class="filter-item ${d.v===null?'active':''}" data-dific="${d.v}" onclick="setFiltro('dificuldade',${d.v},this)">${d.n} <span class="count">${d.v===null?questoesDB.length:questoesDB.filter(q=>q.dificuldade===d.v).length}</span></div>`).join('');
+  const containerDif = document.getElementById('filter-dificuldades');
+  containerDif.innerHTML = dificuldades.map(d => `<div class="filter-item ${state.filters.dificuldade === d.v ? 'active' : ''}" data-dific="${d.v}" onclick="setFiltro('dificuldade',${d.v},this)">${d.n} <span class="count">${d.v===null?questoesDB.length:questoesDB.filter(q=>q.dificuldade===d.v).length}</span></div>`).join('');
   
   const especiais = [{id:"favoritas",nome:"⭐ Favoritas"},{id:"nao-respondidas",nome:"◯ Não respondidas"},{id:"erradas",nome:"✗ Mais erradas"}];
-  document.getElementById('filter-especiais').innerHTML = especiais.map(e => `<div class="filter-item" data-especial="${e.id}" onclick="setFiltroEspecial('${e.id}',this)">${e.nome} <span class="count">0</span></div>`).join('');
+  const containerEsp = document.getElementById('filter-especiais');
+  containerEsp.innerHTML = especiais.map(e => `<div class="filter-item ${state.filters.especial === e.id ? 'active' : ''}" data-especial="${e.id}" onclick="setFiltroEspecial('${e.id}',this)">${e.nome} <span class="count">0</span></div>`).join('');
 }
 
 function setFiltro(tipo, valor, el) {
-  document.querySelectorAll(`.filter-list`).forEach(list => list.querySelectorAll('.filter-item').forEach(i => i.classList.remove('active')));
+  // Remove active de todos os itens do mesmo tipo
+  const parent = el.parentElement;
+  parent.querySelectorAll('.filter-item').forEach(i => i.classList.remove('active'));
   el.classList.add('active');
+  
+  // Atualiza state
   state.filters[tipo] = valor;
+  salvarFiltros();
   renderizarQuestoes();
 }
 
@@ -617,6 +665,7 @@ function setFiltroEspecial(tipo, el) {
   document.querySelectorAll('#filter-especiais .filter-item').forEach(i => i.classList.remove('active'));
   el.classList.add('active');
   state.filters.especial = state.filters.especial === tipo ? null : tipo;
+  salvarFiltros();
   renderizarQuestoes();
 }
 
@@ -650,16 +699,39 @@ function criarCardQuestao(q, numero) {
   const dificuldadeTexto = ['','Fácil','Médio-fácil','Médio','Difícil','Muito difícil'][q.dificuldade];
   
   const card = document.createElement('div');
-  card.className = 'question-card';
+  card.className = `question-card ${jaRespondeu ? 'answered' : ''}`;
   card.innerHTML = `
     <div class="card-header">
-      <div class="badges"><span class="badge badge-banca">${q.banca} ${q.ano}</span><span class="badge badge-materia">${q.materia}</span><span class="badge ${q.dificuldade>=4?'badge-muito-dificil':q.dificuldade>=3?'badge-dificil':''}">${dificuldadeTexto}</span></div>
-      <div class="card-actions"><button class="icon-btn fav ${isFav?'active':''}" onclick="toggleFavorito(${q.id}, event)">⭐</button><button class="icon-btn" onclick="expandirCard(${q.id})">📖</button></div>
+      <div class="badges">
+        <span class="badge badge-banca">${q.banca} ${q.ano}</span>
+        <span class="badge badge-materia">${q.materia}</span>
+        <span class="badge ${q.dificuldade>=4?'badge-muito-dificil':q.dificuldade>=3?'badge-dificil':''}">${dificuldadeTexto}</span>
+        ${jaRespondeu ? '<span class="badge badge-answered">✓ Respondida</span>' : ''}
+      </div>
+      <div class="card-actions">
+        <button class="icon-btn fav ${isFav?'active':''}" onclick="toggleFavorito(${q.id}, event)">⭐</button>
+        <button class="icon-btn" onclick="expandirCard(${q.id})">📖</button>
+      </div>
     </div>
     <div class="card-body">
-      <div class="question-text">${numero}. ${q.enunciado}</div>
-      <div class="alternatives" id="alts-${q.id}">${q.alternativas.map((alt, idx) => `<div class="alt-item ${jaRespondeu && idx === q.correta ? 'correct-answer' : ''} ${jaRespondeu && idx === hist.escolha && idx !== q.correta ? 'selected-wrong' : ''} ${jaRespondeu && idx === hist.escolha && idx === q.correta ? 'selected-correct' : ''}" onclick="responder(${q.id}, ${idx})"><span class="alt-letter">${String.fromCharCode(65+idx)})</span><span class="alt-text">${alt}</span></div>`).join('')}</div>
-      <div class="resolution-box" id="resolucao-${q.id}"><div class="resolution-title"><i class="fas fa-lightbulb"></i> Resolução comentada</div><div class="resolution-text">${q.resolucao}<br><br><strong>✓ Resposta: ${String.fromCharCode(65+q.correta)}) ${q.alternativas[q.correta]}</strong></div></div>
+      <div class="question-text">${q.enunciado}</div>
+      <div class="alternatives" id="alts-${q.id}">
+        ${q.alternativas.map((alt, idx) => {
+          let classe = 'alt-item';
+          if (jaRespondeu) classe += ' disabled';
+          if (jaRespondeu && idx === q.correta) classe += ' correct-answer';
+          if (jaRespondeu && idx === hist.escolha && idx !== q.correta) classe += ' selected-wrong';
+          if (jaRespondeu && idx === hist.escolha && idx === q.correta) classe += ' selected-correct';
+          return `<div class="${classe}" data-idx="${idx}" data-qid="${q.id}" onclick="${!jaRespondeu ? `responder(${q.id}, ${idx})` : ''}">
+            <span class="alt-letter">${String.fromCharCode(65+idx)})</span>
+            <span class="alt-text">${alt}</span>
+          </div>`;
+        }).join('')}
+      </div>
+      <div class="resolution-box" id="resolucao-${q.id}">
+        <div class="resolution-title"><i class="fas fa-lightbulb"></i> Resolução comentada</div>
+        <div class="resolution-text">${q.resolucao}<br><br><strong>✓ Resposta: ${String.fromCharCode(65+q.correta)}) ${q.alternativas[q.correta]}</strong></div>
+      </div>
     </div>
   `;
   if (jaRespondeu) setTimeout(() => document.getElementById(`resolucao-${q.id}`)?.classList.add('show'), 0);
@@ -667,16 +739,24 @@ function criarCardQuestao(q, numero) {
 }
 
 function responder(qid, escolha) {
+  if (state.historico[qid] && state.historico[qid].escolha !== undefined) return;
+  if (state.answering) return;
+  state.answering = true;
+  
   const q = questoesDB.find(x => x.id === qid);
   if (!q) return;
+  
   const acertou = escolha === q.correta;
   if (!state.historico[qid]) state.historico[qid] = { total: 0, acertos: 0, erros: 0 };
   state.historico[qid].total++;
-  acertou ? state.historico[qid].acertos++ : state.historico[qid].erros++;
+  if (acertou) state.historico[qid].acertos++;
+  else state.historico[qid].erros++;
   state.historico[qid].escolha = escolha;
+  
   localStorage.setItem('hist_esa', JSON.stringify(state.historico));
   renderizarQuestoes();
   atualizarStats();
+  setTimeout(() => { state.answering = false; }, 500);
 }
 
 function toggleFavorito(qid, event) {
@@ -687,7 +767,10 @@ function toggleFavorito(qid, event) {
   renderizarQuestoes();
 }
 
-function expandirCard(qid) { document.getElementById(`resolucao-${qid}`)?.classList.toggle('show'); }
+function expandirCard(qid) { 
+  const resolucao = document.getElementById(`resolucao-${qid}`);
+  if (resolucao) resolucao.classList.toggle('show');
+}
 function expandirTodas() { document.querySelectorAll('.resolution-box').forEach(r => r.classList.add('show')); }
 
 function atualizarContadoresEspeciais() {
@@ -759,7 +842,18 @@ function renderSimQuestao() {
   document.getElementById('sim-progress').style.width = ((atual+1)/total)*100 + '%';
   const respostaAtual = respostas[q.id];
   const mostrarGabarito = respostaAtual !== undefined && modo === 'imediato';
-  document.getElementById('sim-question').innerHTML = `<div style="margin-bottom:12px;"><span class="badge badge-banca">${q.banca} ${q.ano}</span> <span class="badge badge-materia">${q.materia}</span></div><div class="question-text">${q.enunciado}</div><div class="alternatives">${q.alternativas.map((alt, idx) => `<div class="alt-item ${mostrarGabarito && idx === q.correta ? 'correct-answer' : ''} ${mostrarGabarito && idx === respostaAtual && respostaAtual !== q.correta ? 'selected-wrong' : ''} ${!mostrarGabarito && idx === respostaAtual ? 'selected-correct' : ''}" onclick="${!mostrarGabarito ? `responderSimulado(${q.id}, ${idx})` : ''}"><span class="alt-letter">${String.fromCharCode(65+idx)})</span><span class="alt-text">${alt}</span></div>`).join('')}</div>${mostrarGabarito ? `<div class="resolution-box show"><div class="resolution-title">${respostaAtual === q.correta ? '✅ Correto!' : '❌ Errou!'}</div><div class="resolution-text">${q.resolucao}<br><br><strong>Resposta correta: ${String.fromCharCode(65+q.correta)}) ${q.alternativas[q.correta]}</strong></div></div>` : ''}`;
+  const jaRespondeu = respostaAtual !== undefined;
+  document.getElementById('sim-question').innerHTML = `<div style="margin-bottom:12px;"><span class="badge badge-banca">${q.banca} ${q.ano}</span> <span class="badge badge-materia">${q.materia}</span></div><div class="question-text">${q.enunciado}</div><div class="alternatives">${q.alternativas.map((alt, idx) => {
+    let classe = 'alt-item';
+    if (jaRespondeu) classe += ' disabled';
+    if (mostrarGabarito && idx === q.correta) classe += ' correct-answer';
+    if (mostrarGabarito && idx === respostaAtual && respostaAtual !== q.correta) classe += ' selected-wrong';
+    if (!mostrarGabarito && idx === respostaAtual) classe += ' selected-correct';
+    return `<div class="${classe}" ${!jaRespondeu ? `onclick="responderSimulado(${q.id}, ${idx})"` : ''}>
+      <span class="alt-letter">${String.fromCharCode(65+idx)})</span>
+      <span class="alt-text">${alt}</span>
+    </div>`;
+  }).join('')}</div>${mostrarGabarito ? `<div class="resolution-box show"><div class="resolution-title">${respostaAtual === q.correta ? '✅ Correto!' : '❌ Errou!'}</div><div class="resolution-text">${q.resolucao}<br><br><strong>Resposta correta: ${String.fromCharCode(65+q.correta)}) ${q.alternativas[q.correta]}</strong></div></div>` : ''}`;
   const isLast = atual === total - 1;
   document.getElementById('sim-prev').style.visibility = atual === 0 ? 'hidden' : 'visible';
   document.getElementById('sim-next').style.display = isLast ? 'none' : 'inline-block';
@@ -767,6 +861,7 @@ function renderSimQuestao() {
 }
 
 function responderSimulado(qid, escolha) {
+  if (state.sim.respostas[qid] !== undefined) return;
   state.sim.respostas[qid] = escolha;
   if (state.sim.modo === 'imediato') {
     const q = questoesDB.find(x => x.id === qid);
@@ -776,7 +871,9 @@ function responderSimulado(qid, escolha) {
     localStorage.setItem('hist_esa', JSON.stringify(state.historico));
     renderSimQuestao();
     atualizarStats();
-  } else renderSimQuestao();
+  } else {
+    renderSimQuestao();
+  }
 }
 
 function simProximo() { if (state.sim.atual < state.sim.questoes.length - 1) { state.sim.atual++; renderSimQuestao(); } }
@@ -801,10 +898,9 @@ function simFinalizar() {
 }
 
 function voltarConfigSimulado() { document.getElementById('sim-setup').style.display = 'block'; document.getElementById('sim-active').style.display = 'none'; document.getElementById('sim-result').style.display = 'none'; }
-function limparHistorico() { if(confirm('Limpar todo o histórico de respostas?')){ state.historico = {}; localStorage.setItem('hist_esa', JSON.stringify(state.historico)); renderizarQuestoes(); atualizarStats(); } }
+function limparHistorico() { if(confirm('Limpar todo o histórico de respostas? Esta ação não pode ser desfeita!')){ state.historico = {}; localStorage.setItem('hist_esa', JSON.stringify(state.historico)); renderizarQuestoes(); atualizarStats(); } }
 function showPanel(panelName) { document.querySelectorAll('.panel').forEach(p => p.classList.remove('active')); document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active')); document.getElementById(`panel-${panelName}`).classList.add('active'); const idx = ['questoes','simulado','estatisticas','erros'].indexOf(panelName); if(idx!==-1) document.querySelectorAll('.nav-tab')[idx]?.classList.add('active'); if(panelName==='estatisticas'||panelName==='erros') atualizarStats(); }
 
-// Inicializar
 init();
 </script>
 </body>
