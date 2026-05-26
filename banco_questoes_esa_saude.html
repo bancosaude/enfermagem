@@ -250,30 +250,16 @@ body { font-family: 'Inter', sans-serif; background: var(--bg-primary); color: v
 </div>
 
 <script>
-// ========== CONTROLE DE ABAS (FOI CORRIGIDO AQUI) ==========
+// ========== CONTROLE DE ABAS ==========
 function showPanel(panelName) {
-  // Esconde todas as abas
   document.querySelectorAll('.panel').forEach(p => p.style.display = 'none');
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-  
-  // Mostra apenas a aba clicada
   document.getElementById('panel-' + panelName).style.display = 'block';
   document.getElementById('tab-' + panelName).classList.add('active');
-  
-  // Atualiza as estatísticas se necessário
   if(panelName === 'estatisticas' || panelName === 'erros') atualizarStats();
 }
 
 // ========== BANCO DE DADOS ==========
-const MATERIAS_CORRETAS = {
-  "Ética Profissional": ["bioética"], "Imunização": ["vacina"], "Fundamentos de Enfermagem": ["pulso"],
-  "Clínica Cirúrgica": ["pós-operatório"], "Programas de Saúde": ["paisc"], "Enfermagem Clínica": ["infarto"],
-  "Vigilância Epidemiológica": ["notificação"], "Materno-Infantil": ["gestação"], "Legislação SUS/ECA": ["sus"],
-  "Cálculo de Medicamentos": ["gotejamento"], "Farmacologia": ["medicamento"], "Saúde Mental": ["esquizofrenia"],
-  "EPI e Biossegurança": ["epi"], "Diabetes e Hipertensão": ["diabetes"], "Urgência e Emergência": ["parada"],
-  "Pediatria": ["criança"], "Animais Peçonhentos": ["serpente"], "DST/HIV": ["hiv"]
-};
-
 const QUESTOES_BASE = [
   {id:1, materia:"Ética Profissional", banca:"IBFC", ano:2016, dificuldade:2, enunciado:"Não é um dos princípios fundamentais da Bioética a:", alternativas:["Humanização","Não maleficência","Justiça","Autonomia","Beneficência"], correta:0, resolucao:"Os quatro princípios fundamentais da Bioética são: Autonomia, Beneficência, Não maleficência e Justiça. A Humanização, embora importante, não é um princípio bioético fundamental."},
   {id:2, materia:"Ética Profissional", banca:"IBFC", ano:2013, dificuldade:2, enunciado:"Sobre autonomia, um dos princípios da Bioética, assinale a alternativa correta.", alternativas:["Obrigação de não causar danos","Poder de tomar decisões sobre sua vida e saúde","Fazer o bem, cuidar da saúde","Distribuição igual dos direitos","Ausência de pressões externas"], correta:1, resolucao:"Autonomia é o respeito à capacidade do indivíduo de tomar decisões sobre sua própria vida e saúde, desde que devidamente informado."},
@@ -290,12 +276,13 @@ const QUESTOES_BASE = [
 let QUESTOES = [];
 const BANCAS = ["ESA", "EsSA", "IBFC", "EAGS", "CRS", "EsFCEx", "CSM", "CAP", "IBADE", "ANVISA"];
 
-// CÓDIGO DO BUG RESOLVIDO: O texto está vindo 100% íntegro sem .substring()
+// CÓDIGO MELHORADO: Adicionado 'baseId' para sabermos qual é a pergunta original de cada clone
 for (let i = 0; i < 530; i++) {
   const base = QUESTOES_BASE[i % QUESTOES_BASE.length];
   QUESTOES.push({
     ...base,
     id: i + 1,
+    baseId: base.id, 
     materia: base.materia,
     banca: BANCAS[i % BANCAS.length],
     ano: 2010 + (i % 14),
@@ -507,7 +494,7 @@ function atualizarStats() {
   statsContainer.innerHTML = `<div class="stats-grid"><div class="stat-card"><div class="stat-value">${QUESTOES.length}</div><div class="stat-label">Total</div></div><div class="stat-card"><div class="stat-value">${totalRespondidas}</div><div class="stat-label">Respondidas</div></div><div class="stat-card"><div class="stat-value">${totalAcertos}</div><div class="stat-label">Acertos</div></div><div class="stat-card"><div class="stat-value">${perc}%</div><div class="stat-label">Taxa de acerto</div></div></div><div class="sim-config-card"><h3><i class="fas fa-chart-pie"></i> Desempenho por matéria</h3>${materiasStats.length>0?materiasStats.map(m => `<div style="margin-bottom: 16px;"><div style="display:flex;justify-content:space-between;margin-bottom: 6px;"><span><strong>${m.materia}</strong></span><span>${m.perc}% (${m.acertos}/${m.total})</span></div><div class="progress-bar"><div class="progress-fill" style="width:${m.perc}%;background:${m.perc>=70?'#10b981':m.perc>=50?'#f59e0b':'#ef4444'}"></div></div></div>`).join(''):'<div class="empty-state">Responda questões para ver estatísticas</div>'}</div>`;
 }
 
-// ========== SIMULADO ==========
+// ========== SIMULADO COM ALGORITMO ANTI-REPETIÇÃO ==========
 function preencherSelectsSimulado() {
   const materias = [...new Set(QUESTOES.map(q => q.materia))];
   const bancas = [...new Set(QUESTOES.map(q => q.banca))];
@@ -515,21 +502,49 @@ function preencherSelectsSimulado() {
   document.getElementById('sim-banca').innerHTML = '<option value="">Todas</option>' + bancas.map(b => `<option value="${b}">${b}</option>`).join('');
 }
 function iniciarSimuladoRapido() { showPanel('simulado'); startSimulado(); }
+
 function startSimulado() {
   const qtd = parseInt(document.getElementById('sim-qtd').value);
   const materia = document.getElementById('sim-materia').value;
   const banca = document.getElementById('sim-banca').value;
   const modo = document.getElementById('sim-modo').value;
+  
   let pool = [...QUESTOES];
   if (materia) pool = pool.filter(q => q.materia === materia);
   if (banca) pool = pool.filter(q => q.banca === banca);
-  for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
-  state.sim = { questoes: pool.slice(0, Math.min(qtd, pool.length)), atual: 0, respostas: {}, modo: modo };
+  
+  // 1. Embaralha todas as questões disponíveis
+  for (let i = pool.length - 1; i > 0; i--) { 
+    const j = Math.floor(Math.random() * (i + 1)); 
+    [pool[i], pool[j]] = [pool[j], pool[i]]; 
+  }
+  
+  // 2. Filtro Inteligente (Impede cópias da mesma base)
+  let selecionadas = [];
+  let baseIdsVistos = new Set();
+  
+  for (let q of pool) {
+    if (!baseIdsVistos.has(q.baseId)) {
+      baseIdsVistos.add(q.baseId);
+      selecionadas.push(q);
+    }
+    // Para de procurar assim que atingir a quantidade solicitada
+    if (selecionadas.length === qtd) break;
+  }
+  
+  // Aviso caso o banco "fake" não tenha perguntas únicas suficientes para preencher
+  if(selecionadas.length < qtd && selecionadas.length > 0) {
+      mostrarToast(`Aviso: Foram encontradas apenas ${selecionadas.length} questões únicas para este simulado.`);
+  }
+
+  state.sim = { questoes: selecionadas, atual: 0, respostas: {}, modo: modo };
+  
   document.getElementById('sim-setup').style.display = 'none';
   document.getElementById('sim-active').style.display = 'block';
   document.getElementById('sim-result').style.display = 'none';
   renderSimQuestao();
 }
+
 function renderSimQuestao() {
   const {questoes, atual, respostas, modo} = state.sim;
   const q = questoes[atual];
@@ -540,7 +555,6 @@ function renderSimQuestao() {
   const mostrarGabarito = respostaAtual !== undefined && modo === 'imediato';
   const jaRespondeu = respostaAtual !== undefined;
   
-  // Aqui o texto também não será cortado
   document.getElementById('sim-question').innerHTML = `<div style="margin-bottom: 16px;"><span class="badge badge-banca">${q.banca} ${q.ano}</span> <span class="badge badge-materia">${q.materia}</span></div><div class="question-text">${q.enunciado}</div><div class="alternatives">${q.alternativas.map((alt, idx) => { let classe = 'alt-item'; if (jaRespondeu) classe += ' disabled'; if (mostrarGabarito && idx === q.correta) classe += ' correct-answer'; if (mostrarGabarito && idx === respostaAtual && respostaAtual !== q.correta) classe += ' selected-wrong'; if (!mostrarGabarito && idx === respostaAtual) classe += ' selected-correct'; return `<div class="${classe}" ${!jaRespondeu ? `onclick="responderSimulado(${q.id}, ${idx})"` : ''}><span class="alt-letter">${String.fromCharCode(65+idx)})</span><span class="alt-text">${alt}</span></div>`; }).join('')}</div>${mostrarGabarito ? `<div class="resolution-box show"><div class="resolution-title">${respostaAtual === q.correta ? '✅ Correto!' : '❌ Errou!'}</div><div class="resolution-text">${q.resolucao}<br><br><strong>Resposta: ${String.fromCharCode(65+q.correta)}) ${q.alternativas[q.correta]}</strong></div></div>` : ''}`;
   const isLast = atual === total - 1;
   document.getElementById('sim-prev').style.visibility = atual === 0 ? 'hidden' : 'visible';
@@ -552,8 +566,6 @@ function simProximo() { if (state.sim.atual < state.sim.questoes.length - 1) { s
 function simAnterior() { if (state.sim.atual > 0) { state.sim.atual--; renderSimQuestao(); } }
 function simPular() { if (state.sim.atual < state.sim.questoes.length - 1) { state.sim.atual++; renderSimQuestao(); } }
 function simFinalizar() { const {questoes, respostas, modo} = state.sim; let acertos = 0, respondidas = 0; questoes.forEach(q => { const resp = respostas[q.id]; if (resp !== undefined) { respondidas++; if (resp === q.correta) acertos++; if (modo !== 'imediato') { if (!state.historico[q.id]) state.historico[q.id] = { total: 0, acertos: 0, erros: 0 }; state.historico[q.id].total++; resp === q.correta ? state.historico[q.id].acertos++ : state.historico[q.id].erros++; } } }); if (modo !== 'imediato') localStorage.setItem('hist_esa', JSON.stringify(state.historico)); const perc = respondidas > 0 ? Math.round((acertos / respondidas) * 100) : 0; const cor = perc >= 70 ? '#10b981' : (perc >= 50 ? '#f59e0b' : '#ef4444'); document.getElementById('sim-active').style.display = 'none'; document.getElementById('sim-result').style.display = 'block'; 
-  
-  // CÓDIGO DO BUG RESOLVIDO NO GABARITO DO SIMULADO (TEXTO 100% VISÍVEL)
   document.getElementById('sim-result').innerHTML = `<div class="sim-config-card"><div style="text-align:center;padding: 24px;"><div style="font-size: 64px;font-weight:800;color:${cor};">${perc}%</div><div style="font-size: 20px;margin: 12px 0;">${perc >= 70 ? '🎉 Excelente!' : (perc >= 50 ? '📚 Continue estudando!' : '💪 Reforce os conteúdos!')}</div><div>${acertos} acertos de ${respondidas} respondidas (${questoes.length} total)</div><div style="margin-top: 8px;">🔥 Sequência atual: ${state.streak} dias</div></div><div style="display:flex;gap:12px;justify-content:center;margin-bottom: 24px;"><button class="btn btn-primary" onclick="startSimulado()"><i class="fas fa-redo-alt"></i> Novo simulado</button><button class="btn btn-outline" onclick="voltarConfigSimulado()"><i class="fas fa-cog"></i> Configurar</button></div><div><strong>📋 Gabarito detalhado</strong></div>${questoes.map(q => { const resp = respostas[q.id]; const acertou = resp === q.correta; return `<div style="padding: 12px;border-bottom: 1px solid var(--border-light);"><div>${q.enunciado}</div><div style="font-size: 13px;margin-top: 8px;color: ${!resp ? '#9ca3cf' : (acertou ? '#10b981' : '#ef4444')};">${!resp ? '⚪ Não respondida' : (acertou ? `✅ Correto: ${String.fromCharCode(65+q.correta)})` : `❌ Sua: ${String.fromCharCode(65+resp)}) | Correto: ${String.fromCharCode(65+q.correta)})`)}</div></div>`; }).join('')}</div>`; 
   atualizarStats(); 
 }
@@ -565,7 +577,6 @@ function toggleTheme() { const isDark = document.body.getAttribute('data-theme')
 function init() {
   if (localStorage.getItem('theme') === 'dark') document.body.setAttribute('data-theme', 'dark');
   
-  // Garante que apenas a tela inicial de questões seja exibida no carregamento
   document.querySelectorAll('.panel').forEach(p => p.style.display = 'none');
   document.getElementById('panel-questoes').style.display = 'block';
 
