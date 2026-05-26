@@ -1,8 +1,0 @@
-📁 esa-saude-plataforma/
-├── 📄 index.html        (Estrutura e SEO)
-├── 📄 manifest.json     (Configuração do App/PWA)
-├── 📄 sw.js             (Service Worker para funcionar OFFLINE)
-├── 📁 css/
-│   └── 📄 style.css     (Design System e UI)
-└── 📁 js/
-    └── 📄 app.js        (Lógica de negócio, Banco e DOM)
