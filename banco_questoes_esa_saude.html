@@ -226,7 +226,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg-primary); color: v
       <div id="sim-setup">
         <div class="sim-config-card">
           <h3 style="margin-bottom: 24px;"><i class="fas fa-sliders-h"></i> Configurar Simulado</h3>
-          <div style="margin-bottom: 15px;"><span style="display:inline-block; width:100px; font-weight:500; font-size:14px;">Quantidade:</span><select id="sim-qtd" style="padding:8px; border-radius:6px; border:1px solid var(--border-light); background:var(--bg-tertiary);"><option value="5">5 questões</option><option value="10" selected>10 questões</option><option value="20">20 questões</option><option value="30">30 questões</option><option value="50">50 questões</option></select></div>
+          <div style="margin-bottom: 15px;"><span style="display:inline-block; width:100px; font-weight:500; font-size:14px;">Quantidade:</span><select id="sim-qtd" style="padding:8px; border-radius:6px; border:1px solid var(--border-light); background:var(--bg-tertiary);"><option value="5" selected>5 questões</option><option value="10">10 questões</option><option value="15">15 questões</option></select></div>
           <div style="margin-bottom: 15px;"><span style="display:inline-block; width:100px; font-weight:500; font-size:14px;">Matéria:</span><select id="sim-materia" style="padding:8px; border-radius:6px; border:1px solid var(--border-light); background:var(--bg-tertiary);"><option value="">Todas</option></select></div>
           <div style="margin-bottom: 15px;"><span style="display:inline-block; width:100px; font-weight:500; font-size:14px;">Banca:</span><select id="sim-banca" style="padding:8px; border-radius:6px; border:1px solid var(--border-light); background:var(--bg-tertiary);"><option value="">Todas</option></select></div>
           <div style="margin-bottom: 15px;"><span style="display:inline-block; width:100px; font-weight:500; font-size:14px;">Correção:</span><select id="sim-modo" style="padding:8px; border-radius:6px; border:1px solid var(--border-light); background:var(--bg-tertiary);"><option value="imediato">Imediata</option><option value="final">Ao final</option></select></div>
@@ -259,8 +259,9 @@ function showPanel(panelName) {
   if(panelName === 'estatisticas' || panelName === 'erros') atualizarStats();
 }
 
-// ========== BANCO DE DADOS ==========
-const QUESTOES_BASE = [
+// ========== BANCO DE DADOS (AGORA APENAS QUESTÕES ÚNICAS E REAIS) ==========
+// Apagamos o laço de repetição. O que está aqui é exatamente o que vai para a tela.
+const QUESTOES = [
   {id:1, materia:"Ética Profissional", banca:"IBFC", ano:2016, dificuldade:2, enunciado:"Não é um dos princípios fundamentais da Bioética a:", alternativas:["Humanização","Não maleficência","Justiça","Autonomia","Beneficência"], correta:0, resolucao:"Os quatro princípios fundamentais da Bioética são: Autonomia, Beneficência, Não maleficência e Justiça. A Humanização, embora importante, não é um princípio bioético fundamental."},
   {id:2, materia:"Ética Profissional", banca:"IBFC", ano:2013, dificuldade:2, enunciado:"Sobre autonomia, um dos princípios da Bioética, assinale a alternativa correta.", alternativas:["Obrigação de não causar danos","Poder de tomar decisões sobre sua vida e saúde","Fazer o bem, cuidar da saúde","Distribuição igual dos direitos","Ausência de pressões externas"], correta:1, resolucao:"Autonomia é o respeito à capacidade do indivíduo de tomar decisões sobre sua própria vida e saúde, desde que devidamente informado."},
   {id:3, materia:"Ética Profissional", banca:"CRS", ano:2010, dificuldade:2, enunciado:"Considerando os princípios da beneficência e da não maleficência, o profissional deve:", alternativas:["Fazer o bem mesmo que cause dano","Priorizar benefícios e minimizar riscos","Agir conforme a vontade da família","Obedecer apenas às ordens médicas","Preservar a confidencialidade"], correta:1, resolucao:"Beneficência = fazer o bem; Não maleficência = não causar dano. O profissional deve equilibrar ambos, maximizando benefícios e minimizando riscos."},
@@ -270,26 +271,13 @@ const QUESTOES_BASE = [
   {id:7, materia:"Fundamentos de Enfermagem", banca:"ESA", ano:2011, dificuldade:2, enunciado:"Ao auscultar o ápice cardíaco no 5º EIC, o técnico está verificando qual pulso?", alternativas:["Femoral","Pedioso","Apical","Radial","Carotídeo"], correta:2, resolucao:"O pulso apical é auscultado no ápice cardíaco (5º EIC, linha hemiclavicular esquerda), sendo o padrão-ouro para verificar frequência cardíaca."},
   {id:8, materia:"Fundamentos de Enfermagem", banca:"ESA", ano:2011, dificuldade:3, enunciado:"Na remoção de sonda nasogástrica, é INCORRETO afirmar:", alternativas:["Clampear por 24h antes","Lavar com 10ml de SF","Puxar delicadamente","Paciente inspirar profundamente","Remover em movimento suave"], correta:3, resolucao:"O paciente deve prender a respiração ou expirar durante a remoção da sonda nasogástrica para evitar broncoaspiração, não inspirar profundamente."},
   {id:9, materia:"Clínica Cirúrgica", banca:"ESA", ano:2013, dificuldade:3, enunciado:"No pré-operatório imediato de craniotomia, o enfermeiro deve:", alternativas:["Administrar pré-anestésico","Verificar SSVV pós-retorno","Orientar sobre procedimento","Realizar tricotomia","Monitorar débito urinário"], correta:0, resolucao:"No pré-operatório imediato, a administração da medicação pré-anestésica é uma ação crucial e privativa do enfermeiro."},
-  {id:10, materia:"Programas de Saúde", banca:"ESA", ano:2015, dificuldade:2, enunciado:"Número de consultas de puericultura no 1º ano pelo PAISC:", alternativas:["2","4","6","7","12"], correta:3, resolucao:"O PAISC recomenda 7 consultas de puericultura no primeiro ano de vida (1ª semana, 1º, 2º, 4º, 6º, 9º e 12º mês)."}
+  {id:10, materia:"Programas de Saúde", banca:"ESA", ano:2015, dificuldade:2, enunciado:"Número de consultas de puericultura no 1º ano pelo PAISC:", alternativas:["2","4","6","7","12"], correta:3, resolucao:"O PAISC recomenda 7 consultas de puericultura no primeiro ano de vida (1ª semana, 1º, 2º, 4º, 6º, 9º e 12º mês)."},
+  {id:11, materia:"Imunização", banca:"EsSA", ano:2018, dificuldade:2, enunciado:"A vacina BCG deve ser administrada por qual via e qual sua principal indicação?", alternativas:["Subcutânea, previne formas graves de tuberculose","Intradérmica, previne formas graves de tuberculose","Intramuscular, previne difteria","Oral, previne poliomielite","Intravenosa, previne tétano neonatal"], correta:1, resolucao:"A BCG é aplicada por via intradérmica (ID), geralmente no braço direito, e protege contra formas graves de tuberculose (miliar e meníngea)."},
+  {id:12, materia:"Urgência e Emergência", banca:"ESA", ano:2020, dificuldade:3, enunciado:"Na reanimação cardiopulmonar (RCP) de um adulto por um socorrista leigo, qual a relação compressão-ventilação recomendada pela AHA?", alternativas:["15 compressões para 2 ventilações","30 compressões para 2 ventilações","100 compressões contínuas sem ventilação","5 compressões para 1 ventilação","20 compressões para 2 ventilações"], correta:1, resolucao:"A recomendação padrão da American Heart Association (AHA) para RCP em adultos com via aérea não avançada é de 30 compressões seguidas por 2 ventilações."},
+  {id:13, materia:"Enfermagem Clínica", banca:"IBFC", ano:2019, dificuldade:2, enunciado:"Um paciente diabético apresenta quadro de hipoglicemia. Qual dos sinais abaixo NÃO é característico desta condição?", alternativas:["Sudorese fria","Taquicardia","Hálito cetônico","Tremores","Confusão mental"], correta:2, resolucao:"O hálito cetônico (odor de maçã podre) é um sinal clássico de Hiperglicemia extrema (Cetoacidose Diabética), e não de hipoglicemia."},
+  {id:14, materia:"Fundamentos de Enfermagem", banca:"EsFCEx", ano:2017, dificuldade:2, enunciado:"Qual a posição mais indicada para a administração de um enema (lavagem intestinal)?", alternativas:["Decúbito dorsal","Posição de Fowler","Posição de Sims","Posição genupeitoral","Decúbito ventral"], correta:2, resolucao:"A Posição de Sims (decúbito lateral esquerdo com a perna direita flexionada) facilita o fluxo da solução em direção ao cólon sigmoide pela gravidade."},
+  {id:15, materia:"Clínica Cirúrgica", banca:"EsSA", ano:2012, dificuldade:3, enunciado:"O dreno de Penrose funciona por qual princípio físico?", alternativas:["Sucção contínua","Pressão negativa","Capilaridade","Gravidade e sucção","Pressão positiva"], correta:2, resolucao:"O dreno de Penrose é um dreno tubular de látex que funciona por capilaridade, levando o líquido da cavidade interna para o meio externo."}
 ];
-
-let QUESTOES = [];
-const BANCAS = ["ESA", "EsSA", "IBFC", "EAGS", "CRS", "EsFCEx", "CSM", "CAP", "IBADE", "ANVISA"];
-
-// CÓDIGO MELHORADO: Adicionado 'baseId' para sabermos qual é a pergunta original de cada clone
-for (let i = 0; i < 530; i++) {
-  const base = QUESTOES_BASE[i % QUESTOES_BASE.length];
-  QUESTOES.push({
-    ...base,
-    id: i + 1,
-    baseId: base.id, 
-    materia: base.materia,
-    banca: BANCAS[i % BANCAS.length],
-    ano: 2010 + (i % 14),
-    dificuldade: 1 + (i % 5),
-    enunciado: `[Questão ${i+1}] ` + base.enunciado 
-  });
-}
 
 // ========== STATE ==========
 let state = {
@@ -483,7 +471,7 @@ function atualizarStats() {
   document.getElementById('erros-count').innerText = erradas.length;
   const errosContainer = document.getElementById('erros-container');
   if (erradas.length === 0) errosContainer.innerHTML = '<div class="empty-state"><i class="fas fa-trophy" style="font-size: 48px; opacity: 0.5;"></i><p>🎉 Nenhum erro registrado! Continue assim!</p></div>';
-  else { errosContainer.innerHTML = ''; erradas.forEach((q, idx) => errosContainer.appendChild(criarCardQuestao(q))); }
+  else { errosContainer.innerHTML = ''; erradas.forEach((q) => errosContainer.appendChild(criarCardQuestao(q))); }
   const statsContainer = document.getElementById('stats-container');
   const materiasStats = [...new Set(QUESTOES.map(q => q.materia))].map(m => {
     const qs = QUESTOES.filter(q => q.materia === m);
@@ -494,7 +482,7 @@ function atualizarStats() {
   statsContainer.innerHTML = `<div class="stats-grid"><div class="stat-card"><div class="stat-value">${QUESTOES.length}</div><div class="stat-label">Total</div></div><div class="stat-card"><div class="stat-value">${totalRespondidas}</div><div class="stat-label">Respondidas</div></div><div class="stat-card"><div class="stat-value">${totalAcertos}</div><div class="stat-label">Acertos</div></div><div class="stat-card"><div class="stat-value">${perc}%</div><div class="stat-label">Taxa de acerto</div></div></div><div class="sim-config-card"><h3><i class="fas fa-chart-pie"></i> Desempenho por matéria</h3>${materiasStats.length>0?materiasStats.map(m => `<div style="margin-bottom: 16px;"><div style="display:flex;justify-content:space-between;margin-bottom: 6px;"><span><strong>${m.materia}</strong></span><span>${m.perc}% (${m.acertos}/${m.total})</span></div><div class="progress-bar"><div class="progress-fill" style="width:${m.perc}%;background:${m.perc>=70?'#10b981':m.perc>=50?'#f59e0b':'#ef4444'}"></div></div></div>`).join(''):'<div class="empty-state">Responda questões para ver estatísticas</div>'}</div>`;
 }
 
-// ========== SIMULADO COM ALGORITMO ANTI-REPETIÇÃO ==========
+// ========== SIMULADO ==========
 function preencherSelectsSimulado() {
   const materias = [...new Set(QUESTOES.map(q => q.materia))];
   const bancas = [...new Set(QUESTOES.map(q => q.banca))];
@@ -513,28 +501,16 @@ function startSimulado() {
   if (materia) pool = pool.filter(q => q.materia === materia);
   if (banca) pool = pool.filter(q => q.banca === banca);
   
-  // 1. Embaralha todas as questões disponíveis
+  // Embaralha as questões e pega a quantidade solicitada
   for (let i = pool.length - 1; i > 0; i--) { 
     const j = Math.floor(Math.random() * (i + 1)); 
     [pool[i], pool[j]] = [pool[j], pool[i]]; 
   }
   
-  // 2. Filtro Inteligente (Impede cópias da mesma base)
-  let selecionadas = [];
-  let baseIdsVistos = new Set();
-  
-  for (let q of pool) {
-    if (!baseIdsVistos.has(q.baseId)) {
-      baseIdsVistos.add(q.baseId);
-      selecionadas.push(q);
-    }
-    // Para de procurar assim que atingir a quantidade solicitada
-    if (selecionadas.length === qtd) break;
-  }
-  
-  // Aviso caso o banco "fake" não tenha perguntas únicas suficientes para preencher
+  let selecionadas = pool.slice(0, Math.min(qtd, pool.length));
+
   if(selecionadas.length < qtd && selecionadas.length > 0) {
-      mostrarToast(`Aviso: Foram encontradas apenas ${selecionadas.length} questões únicas para este simulado.`);
+      mostrarToast(`Aviso: Temos apenas ${selecionadas.length} questões com esses filtros.`);
   }
 
   state.sim = { questoes: selecionadas, atual: 0, respostas: {}, modo: modo };
